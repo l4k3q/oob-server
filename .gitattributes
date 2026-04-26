@@ -1,0 +1,5 @@
+bytecode-service/libs/*.tar.gz filter=lfs diff=lfs merge=lfs -text
+bytecode-service/libs/*.jar filter=lfs diff=lfs merge=lfs -text
+bytecode-service/target/*.jar filter=lfs diff=lfs merge=lfs -text
+bytecode-service/target/*.jar.original filter=lfs diff=lfs merge=lfs -text
+deser-targets/hessian.jar filter=lfs diff=lfs merge=lfs -text

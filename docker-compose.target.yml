@@ -1,0 +1,145 @@
+version: "3.9"
+
+# ── Vulnerable Java target lab ──────────────────────────────────────────────────
+# Deploy on the target machine. All services are intentionally vulnerable.
+# Set OOB_HOST to the IP of your OOBserver (CT1) so payloads call back correctly.
+#
+# Usage:
+#   OOB_HOST=10.0.7.25 docker compose -f docker-compose.target.yml up -d
+
+networks:
+  vulnlab:
+    driver: bridge
+
+services:
+
+  # ── Log4Shell (CVE-2021-44228) ────────────────────────────────────────────
+  log4shell:
+    image: ghcr.io/christophetd/log4shell-vulnerable-app:latest
+    container_name: vuln-log4shell
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "Log4Shell CVE-2021-44228"
+      payload: "log4shell_basic"
+
+  # ── Apache Shiro CVE-2016-4437 (AES-CBC RememberMe RCE) ──────────────────
+  shiro-cbc:
+    image: registry.cn-hangzhou.aliyuncs.com/vulhub/shiro:1.2.4
+    container_name: vuln-shiro-cbc
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "Shiro CVE-2016-4437 AES-CBC"
+      payload: "shiro_cbc"
+
+  # ── Spring Boot + Shiro AES-GCM (CVE-2020-11989) ─────────────────────────
+  shiro-gcm:
+    image: registry.cn-hangzhou.aliyuncs.com/vulhub/shiro:1.6.0
+    container_name: vuln-shiro-gcm
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "Shiro CVE-2020-11989 AES-GCM"
+      payload: "shiro_gcm"
+
+  # ── Fastjson 1.2.47 RCE (CVE-2019-14439 / JNDI) ─────────────────────────
+  fastjson:
+    image: vulfocus/fastjson-rce-2019-2ystemd:latest
+    container_name: vuln-fastjson
+    restart: unless-stopped
+    ports:
+      - "8084:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "Fastjson ≤1.2.47 JNDI RCE"
+      payload: "fastjson_jdbcrowset"
+
+  # ── XStream 1.4.17 CVE-2021-39144 ────────────────────────────────────────
+  xstream:
+    image: vulfocus/xstream-cve-2021-39144:latest
+    container_name: vuln-xstream
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "XStream CVE-2021-39144"
+      payload: "xstream_exec"
+
+  # ── Spring4Shell CVE-2022-22965 ───────────────────────────────────────────
+  spring4shell:
+    image: ghcr.io/cyberxsecurity/spring4shell-vulnerable-app:latest
+    container_name: vuln-spring4shell
+    restart: unless-stopped
+    ports:
+      - "8086:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "Spring4Shell CVE-2022-22965"
+      payload: "ms_spring_interceptor_cmd"
+
+  # ── SnakeYAML deserialization (CVE-2022-1471) ─────────────────────────────
+  snakeyaml:
+    image: vulfocus/snakeyaml-rce-2022-1471:latest
+    container_name: vuln-snakeyaml
+    restart: unless-stopped
+    ports:
+      - "8087:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "SnakeYAML CVE-2022-1471"
+      payload: "snakeyaml_spi"
+
+  # ── Apache Dubbo Hessian2 (CVE-2021-25641) ───────────────────────────────
+  dubbo:
+    image: registry.cn-hangzhou.aliyuncs.com/vulhub/dubbo:2.7.3
+    container_name: vuln-dubbo
+    restart: unless-stopped
+    ports:
+      - "20880:20880"
+      - "8088:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "Dubbo Hessian2 CVE-2021-25641"
+      payload: "hessian2_spring"
+
+  # ── C3P0 secondary deserialization (0.9.5.2) ─────────────────────────────
+  c3p0:
+    image: vulfocus/c3p0-secondary-deserialization:latest
+    container_name: vuln-c3p0
+    restart: unless-stopped
+    ports:
+      - "8089:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "C3P0 secondary deserialization"
+      payload: "c3p0_jndi"
+
+  # ── Commons Collections 3.2.1 (general Java deser endpoint) ─────────────
+  java-deser:
+    image: vulfocus/java-deserialize:latest
+    container_name: vuln-java-deser
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    networks:
+      - vulnlab
+    labels:
+      vuln: "Java native deserialization (CC6)"
+      payload: "ysoserial_cc6"

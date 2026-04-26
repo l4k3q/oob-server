@@ -1,0 +1,706 @@
+"""Payload chain catalog — each entry describes one generatable payload type.
+
+The Java sidecar (bytecode-service) drives actual generation.  This module
+provides the Python-side manifest so the UI can render a picker with categories,
+descriptions, and parameter schemas without hitting the sidecar first.
+
+To add a new chain: append an entry here and implement the corresponding handler
+in bytecode-service/src/main/java/com/oobx/chains/.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass
+class ParamSpec:
+    name: str
+    type: str  # string / int / bool / select
+    default: Any = None
+    options: list[str] = field(default_factory=list)
+    required: bool = False
+    description: str = ""
+
+
+@dataclass
+class ChainEntry:
+    id: str                      # unique key used in API paths
+    category: str                # serialize / jndi / memshell / exfil / misc
+    sub_category: str            # library or framework
+    name: str                    # display name
+    description: str
+    params: list[ParamSpec] = field(default_factory=list)
+    requires_sidecar: bool = True
+    tags: list[str] = field(default_factory=list)
+
+
+CATALOG: list[ChainEntry] = [
+    # ── Serialization gadget chains ─────────────────────────────────────────
+    ChainEntry(
+        id="ysoserial_cc1",
+        category="serialize",
+        sub_category="Commons-Collections",
+        name="CommonsCollections1",
+        description="Classic CC1 chain via LazyMap+TiedMapEntry (JDK<8u71, CC3.1/3.2.1)",
+        params=[ParamSpec("cmd", "string", required=True, description="OS command to execute")],
+        tags=["ysoserial", "CC1", "classic"],
+    ),
+    ChainEntry(
+        id="ysoserial_cc2",
+        category="serialize",
+        sub_category="Commons-Collections",
+        name="CommonsCollections2",
+        description="CC2 chain via PriorityQueue+InvokerTransformer (CC4.0)",
+        params=[ParamSpec("cmd", "string", required=True)],
+        tags=["ysoserial", "CC2"],
+    ),
+    ChainEntry(
+        id="ysoserial_cc3",
+        category="serialize",
+        sub_category="Commons-Collections",
+        name="CommonsCollections3",
+        description="CC3 via InstantiateTransformer, loads remote class",
+        params=[
+            ParamSpec("cmd", "string", required=True),
+            ParamSpec("classUrl", "string", description="Remote class URL (leave blank for JNDI mode)"),
+        ],
+        tags=["ysoserial", "CC3"],
+    ),
+    ChainEntry(
+        id="ysoserial_cc4", category="serialize", sub_category="Commons-Collections",
+        name="CommonsCollections4", description="CC4 chain (CC4.0, Java8+)",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "CC4"],
+    ),
+    ChainEntry(
+        id="ysoserial_cc5", category="serialize", sub_category="Commons-Collections",
+        name="CommonsCollections5", description="CC5 via BadAttributeValueExpException",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "CC5"],
+    ),
+    ChainEntry(
+        id="ysoserial_cc6", category="serialize", sub_category="Commons-Collections",
+        name="CommonsCollections6", description="CC6 — JDK-version-independent CC chain",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "CC6"],
+    ),
+    ChainEntry(
+        id="ysoserial_cc7", category="serialize", sub_category="Commons-Collections",
+        name="CommonsCollections7", description="CC7 via Hashtable collision",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "CC7"],
+    ),
+    ChainEntry(
+        id="ysoserial_cb1", category="serialize", sub_category="Commons-BeanUtils",
+        name="CommonsBeanutils1",
+        description="CBU1 — no CC dependency, works on Shiro classpath",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "shiro", "CB1"],
+    ),
+    ChainEntry(
+        id="ysoserial_spring1", category="serialize", sub_category="Spring",
+        name="Spring1", description="Spring1 via ObjectFactoryDelegatingInvocationHandler",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "spring"],
+    ),
+    ChainEntry(
+        id="ysoserial_spring2", category="serialize", sub_category="Spring",
+        name="Spring2", description="Spring2 via AOPC",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "spring"],
+    ),
+    ChainEntry(
+        id="ysoserial_hibernate1", category="serialize", sub_category="Hibernate",
+        name="Hibernate1", description="Hibernate1 via TypedValue",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "hibernate"],
+    ),
+    ChainEntry(
+        id="ysoserial_rome", category="serialize", sub_category="Rome",
+        name="ROME", description="Rome feed library gadget chain",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "rome"],
+    ),
+    ChainEntry(
+        id="ysoserial_groovy1", category="serialize", sub_category="Groovy",
+        name="Groovy1", description="Groovy ConvertedClosure chain",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "groovy"],
+    ),
+    ChainEntry(
+        id="ysoserial_jdk7u21", category="serialize", sub_category="JDK",
+        name="Jdk7u21", description="JDK7u21 AnnotationInvocationHandler gadget",
+        params=[ParamSpec("cmd", "string", required=True)], tags=["ysoserial", "jdk"],
+    ),
+    ChainEntry(
+        id="ysoserial_urldns", category="serialize", sub_category="JDK",
+        name="URLDNS", description="DNS-only chain for detection (no code exec)",
+        params=[ParamSpec("url", "string", required=True, description="URL to trigger DNS lookup")],
+        tags=["ysoserial", "detection", "dns"],
+    ),
+    ChainEntry(
+        id="ysoserial_jrmp_client", category="serialize", sub_category="RMI",
+        name="JRMPClient", description="JRMP client chain — triggers outbound RMI connection",
+        params=[
+            ParamSpec("host", "string", required=True),
+            ParamSpec("port", "int", default=1099),
+        ],
+        tags=["ysoserial", "jrmp", "rmi"],
+    ),
+    # CB without CC (Shiro bypass)
+    ChainEntry(
+        id="cb_no_cc", category="serialize", sub_category="Shiro",
+        name="CBU1 (no-CC Shiro)",
+        description="CommonsBeanutils1 with self-contained comparator — no CC on classpath required; ideal for Shiro 550/721",
+        params=[ParamSpec("cmd", "string", required=True)],
+        tags=["shiro", "bypass", "CB_no_CC"],
+    ),
+    # ── JNDI / Bypass chains ────────────────────────────────────────────────
+    ChainEntry(
+        id="jndi_ldap_basic",
+        category="jndi",
+        sub_category="LDAP",
+        name="JNDI LDAP Basic",
+        description="Classic LDAP reference — remote class load via codebase (JDK ≤8u191/11.0.1)",
+        params=[
+            ParamSpec("token", "string", required=True, description="OOB token"),
+            ParamSpec("class_name", "string", default="Exploit", description="Malicious class name"),
+        ],
+        requires_sidecar=False,
+        tags=["jndi", "ldap", "log4shell"],
+    ),
+    ChainEntry(
+        id="jndi_rmi_basic", category="jndi", sub_category="RMI",
+        name="JNDI RMI Basic",
+        description="RMI reference — remote class load (JDK ≤8u113)",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("class_name", "string", default="Exploit"),
+        ],
+        requires_sidecar=False, tags=["jndi", "rmi"],
+    ),
+    ChainEntry(
+        id="jndi_ldap_deserialize", category="jndi", sub_category="LDAP",
+        name="JNDI LDAP + Deserialize",
+        description="LDAP javaSerializedData attr — works on any JDK version if target has a deserializable library",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("chain", "select", default="CommonsCollections6",
+                      options=["CommonsCollections6", "CommonsBeanutils1", "Spring1", "ROME"]),
+            ParamSpec("cmd", "string", required=True),
+        ],
+        tags=["jndi", "ldap", "deserialize", "high-jdk"],
+    ),
+    ChainEntry(
+        id="jndi_ldap_el", category="jndi", sub_category="LDAP",
+        name="JNDI LDAP EL Injection",
+        description="EL Expression bypass via javaRemoteLocation + SpringEL / BeanEL (Tomcat/Spring classpath)",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("cmd", "string", required=True),
+            ParamSpec("el_engine", "select", default="spring", options=["spring", "bsh", "groovy"]),
+        ],
+        tags=["jndi", "ldap", "bypass", "el", "high-jdk"],
+    ),
+    ChainEntry(
+        id="jndi_ldap_groovy", category="jndi", sub_category="LDAP",
+        name="JNDI LDAP Groovy Bypass",
+        description="Groovy ScriptEngine bypass for JDK17 environments where groovy is on classpath",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("cmd", "string", required=True),
+        ],
+        tags=["jndi", "ldap", "bypass", "groovy", "jdk17"],
+    ),
+    ChainEntry(
+        id="jndi_ldap_bcel", category="jndi", sub_category="LDAP",
+        name="JNDI LDAP BCEL",
+        description="BCEL classloader bypass (com.sun.org.apache.bcel)",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("cmd", "string", required=True),
+        ],
+        tags=["jndi", "ldap", "bypass", "bcel"],
+    ),
+    # ── Memshell ─────────────────────────────────────────────────────────────
+    ChainEntry(
+        id="memshell_tomcat_filter",
+        category="memshell",
+        sub_category="Tomcat",
+        name="Tomcat Filter Memshell",
+        description="Inject a Filter into running Tomcat StandardContext; survives app restart, not server restart",
+        params=[
+            ParamSpec("url_pattern", "string", default="/favicon.ico"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="behinder",
+                      options=["behinder", "godzilla", "cmd", "c2", "custom"]),
+            ParamSpec("custom_code", "string", description="Base64 bytecode for custom shell type"),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap", "jndi_rmi", "serialize"]),
+            ParamSpec("token", "string", description="OOB token for JNDI delivery"),
+        ],
+        tags=["memshell", "tomcat", "filter", "c2"],
+    ),
+    ChainEntry(
+        id="memshell_tomcat_servlet",
+        category="memshell", sub_category="Tomcat",
+        name="Tomcat Servlet Memshell",
+        description="Register a Servlet into running Tomcat context",
+        params=[
+            ParamSpec("url_pattern", "string", default="/cmd"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="behinder",
+                      options=["behinder", "godzilla", "cmd", "c2"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap", "serialize"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "tomcat", "servlet"],
+    ),
+    ChainEntry(
+        id="memshell_tomcat_listener",
+        category="memshell", sub_category="Tomcat",
+        name="Tomcat Listener Memshell",
+        description="Register a ServletRequestListener — fired on every request",
+        params=[
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="cmd", options=["cmd", "behinder", "godzilla"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap", "serialize"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "tomcat", "listener"],
+    ),
+    ChainEntry(
+        id="memshell_tomcat_valve",
+        category="memshell", sub_category="Tomcat",
+        name="Tomcat Valve Memshell",
+        description="Insert a Valve into pipeline — harder to detect than Filter",
+        params=[
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="behinder", options=["behinder", "godzilla", "cmd"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap", "serialize"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "tomcat", "valve"],
+    ),
+    ChainEntry(
+        id="memshell_tomcat_executor",
+        category="memshell", sub_category="Tomcat",
+        name="Tomcat Executor/Upgrade Memshell",
+        description="HTTP Upgrade / Executor-based shell — bypasses some Valve/Filter monitors",
+        params=[
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="behinder", options=["behinder", "cmd"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "tomcat", "upgrade", "executor"],
+    ),
+    ChainEntry(
+        id="memshell_spring_interceptor",
+        category="memshell", sub_category="Spring",
+        name="Spring MVC Interceptor Memshell",
+        description="Register a Spring HandlerInterceptor via RequestMappingHandlerMapping",
+        params=[
+            ParamSpec("url_pattern", "string", default="/**"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="behinder", options=["behinder", "godzilla", "cmd"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap", "serialize"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "spring", "interceptor"],
+    ),
+    ChainEntry(
+        id="memshell_spring_controller",
+        category="memshell", sub_category="Spring",
+        name="Spring Controller Memshell",
+        description="Dynamically register a @RequestMapping controller bean",
+        params=[
+            ParamSpec("url_pattern", "string", default="/act"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="behinder", options=["behinder", "godzilla", "cmd"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap", "serialize"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "spring", "controller"],
+    ),
+    ChainEntry(
+        id="memshell_spring_webflux",
+        category="memshell", sub_category="Spring",
+        name="Spring WebFlux Handler Memshell",
+        description="RouterFunction-based reactive handler injection (Spring WebFlux)",
+        params=[
+            ParamSpec("url_pattern", "string", default="/flux"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="cmd", options=["cmd", "behinder"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "spring", "webflux"],
+    ),
+    ChainEntry(
+        id="memshell_jetty_filter",
+        category="memshell", sub_category="Jetty",
+        name="Jetty Filter Memshell",
+        description="Inject FilterHolder into Jetty ServletContextHandler",
+        params=[
+            ParamSpec("url_pattern", "string", default="/j"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="cmd", options=["cmd", "behinder"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "jetty", "filter"],
+    ),
+    ChainEntry(
+        id="memshell_jboss_filter",
+        category="memshell", sub_category="JBoss",
+        name="JBoss/WildFly Undertow Filter Memshell",
+        description="Inject into JBoss Undertow HttpHandler chain",
+        params=[
+            ParamSpec("url_pattern", "string", default="/jb"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="cmd", options=["cmd", "behinder"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "jboss", "undertow", "wildfly"],
+    ),
+    ChainEntry(
+        id="memshell_weblogic_filter",
+        category="memshell", sub_category="WebLogic",
+        name="WebLogic Filter Memshell",
+        description="Inject via WebLogic FilterDef / FilterMapping API",
+        params=[
+            ParamSpec("url_pattern", "string", default="/wl"),
+            ParamSpec("password", "string", default="cmd"),
+            ParamSpec("shell_type", "select", default="cmd", options=["cmd", "behinder", "godzilla"]),
+            ParamSpec("deliver_via", "select", default="class_load",
+                      options=["class_load", "jndi_ldap", "serialize"]),
+            ParamSpec("token", "string"),
+        ],
+        tags=["memshell", "weblogic", "filter"],
+    ),
+    ChainEntry(
+        id="memshell_agent_inject",
+        category="memshell", sub_category="JavaAgent",
+        name="Java Agent Inject (jattach)",
+        description="Inject bytecode via Java Instrumentation API using jattach — works on running JVM without code injection path",
+        params=[
+            ParamSpec("pid", "string", required=True, description="Target JVM PID"),
+            ParamSpec("agent_jar", "string", description="Path to agent jar on target host"),
+            ParamSpec("shell_type", "select", default="tomcat_filter",
+                      options=["tomcat_filter", "spring_interceptor", "custom"]),
+            ParamSpec("password", "string", default="cmd"),
+        ],
+        tags=["memshell", "agent", "jattach", "instrumentation"],
+    ),
+    # ── Exfil / OOB utility ──────────────────────────────────────────────────
+    ChainEntry(
+        id="exfil_http_get",
+        category="exfil",
+        sub_category="HTTP",
+        name="HTTP GET Exfil",
+        description="Generate a URL that encodes a data value in path/param for HTTP callback",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("data_expr", "string", default="${env:JAVA_HOME}",
+                      description="Expression to exfiltrate (Log4j/OGNL/EL/SPEL syntax)"),
+        ],
+        requires_sidecar=False,
+        tags=["exfil", "http", "log4j"],
+    ),
+    ChainEntry(
+        id="exfil_dns_lookup",
+        category="exfil", sub_category="DNS",
+        name="DNS Lookup Exfil",
+        description="Trigger DNS query encoding data as subdomain (requires dns_enabled=true on OOBserver or external resolver)",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("data_expr", "string", default="${env:JAVA_HOME}"),
+        ],
+        requires_sidecar=False,
+        tags=["exfil", "dns"],
+    ),
+    ChainEntry(
+        id="exfil_fastjson",
+        category="exfil", sub_category="FastJson",
+        name="FastJson JdbcRowSetImpl JNDI",
+        description="FastJson 1.2.x RCE via JdbcRowSetImpl.dataSourceName JNDI trigger",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("ldap_or_rmi", "select", default="ldap", options=["ldap", "rmi"]),
+        ],
+        requires_sidecar=False,
+        tags=["fastjson", "jndi", "rce"],
+    ),
+    ChainEntry(
+        id="exfil_snakeyaml",
+        category="exfil", sub_category="SnakeYAML",
+        name="SnakeYAML !!tag JNDI",
+        description="SnakeYAML RCE via !!javax.script.ScriptEngineManager or SPI load from URL",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("mode", "select", default="spi",
+                      options=["spi", "script_engine", "c3p0"]),
+        ],
+        requires_sidecar=False,
+        tags=["snakeyaml", "jndi", "rce"],
+    ),
+    ChainEntry(
+        id="exfil_xstream",
+        category="exfil", sub_category="XStream",
+        name="XStream SSRF/RCE",
+        description="XStream deserialization payload — EventHandler / TreeSet / DynamicProxy chains",
+        params=[
+            ParamSpec("cmd", "string", required=True),
+            ParamSpec("chain", "select", default="EventHandler",
+                      options=["EventHandler", "TreeSetComparator", "CVE_2021_39149"]),
+        ],
+        tags=["xstream", "deserialize", "rce"],
+    ),
+    ChainEntry(
+        id="xstream_eventhandler",
+        category="serialize", sub_category="XStream",
+        name="XStream EventHandler gadget",
+        description="XStream CVE-2021-39144 — EventHandler动态代理触发ProcessBuilder.start()执行命令",
+        params=[ParamSpec("cmd", "string", required=True)],
+        tags=["xstream", "rce"],
+    ),
+    ChainEntry(
+        id="fastjson_jdbcrowset",
+        category="exfil", sub_category="FastJson",
+        name="Fastjson JdbcRowSetImpl JNDI",
+        description="Fastjson ≤1.2.47 autoType — JdbcRowSetImpl.dataSourceName触发JNDI lookup",
+        params=[ParamSpec("jndi_url", "string", required=True,
+                          description="JNDI回连地址 ldap://OOBserver:1389/token")],
+        tags=["fastjson", "jndi", "rce"],
+    ),
+    ChainEntry(
+        id="fastjson_jdbcrowset_v2",
+        category="exfil", sub_category="FastJson",
+        name="Fastjson JdbcRowSetImpl (≤1.2.80 bypass)",
+        description="Fastjson ≤1.2.80 — 先注册类再利用的autoType bypass，绕过高版本黑名单",
+        params=[ParamSpec("jndi_url", "string", required=True)],
+        tags=["fastjson", "jndi", "bypass"],
+    ),
+    ChainEntry(
+        id="fastjson_bcel",
+        category="exfil", sub_category="FastJson",
+        name="Fastjson BCEL ClassLoader",
+        description="Fastjson ≤1.2.24 — BCEL ClassLoader加载远程字节码，无需JNDI",
+        params=[ParamSpec("jndi_url", "string", required=True,
+                          description="BCEL classloader URL (http://host/Exploit.class)")],
+        tags=["fastjson", "bcel", "rce"],
+    ),
+    ChainEntry(
+        id="exfil_hessian",
+        category="exfil", sub_category="Hessian",
+        name="Hessian Deserialization",
+        description="Hessian/Hessian2 gadget chain — Spring/Rome/XBean/JNDI",
+        params=[
+            ParamSpec("cmd", "string", required=True),
+            ParamSpec("chain", "select", default="SpringPartial",
+                      options=["SpringPartial", "Rome", "XBean", "JNDI"]),
+        ],
+        tags=["hessian", "deserialize", "rce"],
+    ),
+    ChainEntry(
+        id="exfil_shiro",
+        category="exfil", sub_category="Shiro",
+        name="Shiro 550/721 RememberMe (手动内层)",
+        description="Apache Shiro RememberMe AES-CBC/GCM包装 — 手动提供inner_payload_b64",
+        params=[
+            ParamSpec("key_b64", "string", required=True, description="Shiro AES key in Base64"),
+            ParamSpec("inner_payload_b64", "string", required=True, description="已生成的序列化payload base64"),
+            ParamSpec("mode", "select", default="cbc", options=["cbc", "gcm"]),
+        ],
+        tags=["shiro", "deserialize", "aes", "cookie"],
+    ),
+    ChainEntry(
+        id="shiro_cbc",
+        category="serialize", sub_category="Shiro",
+        name="Shiro 550 AES-CBC 一键生成",
+        description="Apache Shiro RememberMe CVE-2016-4437 — 自动调用ysoserial生成内层gadget并AES-CBC加密，直接输出rememberMe cookie值",
+        params=[
+            ParamSpec("key_b64", "string", default="kPH+bIxk5D2deZiIxcaaaA==",
+                      description="Shiro默认AES Key (Base64)，可从源码/配置获取"),
+            ParamSpec("chain", "select", default="CommonsCollections6",
+                      options=["CommonsCollections6", "CommonsCollections1", "CommonsBeanutils1",
+                               "Spring1", "ROME", "Hibernate1"]),
+            ParamSpec("cmd", "string", required=True, description="要执行的命令"),
+        ],
+        tags=["shiro", "cve-2016-4437", "aes-cbc", "cookie", "one-shot"],
+    ),
+    ChainEntry(
+        id="shiro_gcm",
+        category="serialize", sub_category="Shiro",
+        name="Shiro 721 AES-GCM 一键生成",
+        description="Apache Shiro RememberMe CVE-2020-11989 — AES-GCM模式，针对Shiro 1.5.3+修复了CBC padding oracle的版本",
+        params=[
+            ParamSpec("key_b64", "string", required=True, description="Shiro AES Key (Base64)"),
+            ParamSpec("chain", "select", default="CommonsCollections6",
+                      options=["CommonsCollections6", "CommonsBeanutils1", "Spring1"]),
+            ParamSpec("cmd", "string", required=True),
+        ],
+        tags=["shiro", "cve-2020-11989", "aes-gcm", "cookie"],
+    ),
+    ChainEntry(
+        id="hessian1_spring",
+        category="serialize", sub_category="Hessian",
+        name="Hessian1 Spring AOP",
+        description="Hessian1协议反序列化 — Spring AOP PartiallyComparableAdvisorHolder触发JNDI，适用于使用Hessian RPC的服务（Dubbo/HSF等）",
+        params=[
+            ParamSpec("jndi_url", "string", required=True,
+                      description="JNDI回连地址 ldap://OOBserver:1389/token"),
+            ParamSpec("gadget", "select", default="spring",
+                      options=["spring", "rome", "xbean"]),
+        ],
+        tags=["hessian", "hessian1", "dubbo", "rpc", "jndi", "spring-aop"],
+    ),
+    ChainEntry(
+        id="hessian2_spring",
+        category="serialize", sub_category="Hessian",
+        name="Hessian2 Spring AOP",
+        description="Hessian2协议反序列化 — 与hessian1相同gadget但使用Hessian2协议帧，适用于Hessian2 RPC接口",
+        params=[
+            ParamSpec("jndi_url", "string", required=True),
+            ParamSpec("gadget", "select", default="spring", options=["spring", "rome"]),
+        ],
+        tags=["hessian2", "dubbo", "rpc", "jndi"],
+    ),
+    ChainEntry(
+        id="c3p0_jndi",
+        category="serialize", sub_category="C3P0",
+        name="C3P0 JNDI Lookup",
+        description="C3P0 WrapperConnectionPoolDataSource反序列化 — userOverridesAsString触发JNDI lookup，适用于classpath含c3p0≤0.9.5.2的目标",
+        params=[
+            ParamSpec("jndi_url", "string", required=True,
+                      description="JNDI回连地址 ldap://OOBserver:1389/token"),
+        ],
+        tags=["c3p0", "jndi", "secondary-deser"],
+    ),
+    ChainEntry(
+        id="c3p0_wrapperds",
+        category="serialize", sub_category="C3P0",
+        name="C3P0 二次反序列化",
+        description="C3P0 PoolBackedDataSource嵌套任意ysoserial payload — 在C3P0还原时触发二次反序列化，可绕过只黑名单C3P0的WAF",
+        params=[
+            ParamSpec("chain", "select", default="CommonsCollections6",
+                      options=["CommonsCollections6", "CommonsCollections1", "CommonsBeanutils1", "Spring1"]),
+            ParamSpec("cmd", "string", required=True),
+        ],
+        tags=["c3p0", "secondary-deser", "bypass-waf"],
+    ),
+    ChainEntry(
+        id="exfil_log4j",
+        category="exfil", sub_category="Log4j",
+        name="Log4Shell (CVE-2021-44228)",
+        description="Log4j2 JNDI injection string — ${jndi:ldap://...} with token-encoded callback",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("protocol", "select", default="ldap", options=["ldap", "ldaps", "rmi"]),
+            ParamSpec("obfuscate", "select", default="none",
+                      options=["none", "upper_lookup", "lower_lookup", "date_format", "nested"]),
+        ],
+        requires_sidecar=False,
+        tags=["log4j", "log4shell", "jndi", "cve-2021-44228"],
+    ),
+
+    # ── 不出网 / 无回显 盲打 ──────────────────────────────────────────────────
+    ChainEntry(
+        id="blind_time_sleep",
+        category="blind",
+        sub_category="Time-based",
+        name="时间盲注 — sleep",
+        description="无回显场景：注入 sleep/timeout 命令，通过响应延迟验证 RCE 可达性",
+        params=[
+            ParamSpec("seconds", "int", default=5, description="延迟秒数"),
+            ParamSpec("os", "select", default="linux", options=["linux", "windows", "auto"]),
+        ],
+        requires_sidecar=False,
+        tags=["blind", "time", "no-echo", "rce"],
+    ),
+    ChainEntry(
+        id="blind_icmp_ping",
+        category="blind",
+        sub_category="ICMP",
+        name="ICMP Ping 外带",
+        description="无出网 HTTP/DNS 场景：ping OOBserver IP，在 TCP/ICMP 流量监控中验证命中",
+        params=[
+            ParamSpec("oob_ip", "string", required=True, description="OOBserver IP（目标可内网访问）"),
+            ParamSpec("count", "int", default=3),
+            ParamSpec("os", "select", default="linux", options=["linux", "windows"]),
+        ],
+        requires_sidecar=False,
+        tags=["blind", "icmp", "ping", "no-internet", "no-echo"],
+    ),
+    ChainEntry(
+        id="blind_http_oob",
+        category="blind",
+        sub_category="HTTP OOB",
+        name="HTTP 内网 OOB 回调",
+        description="不出公网场景：curl/wget 访问内网 OOBserver HTTP 端口，带 token 作标识",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("data_expr", "string", default="$(id)", description="要带出的数据/命令"),
+            ParamSpec("method", "select", default="curl", options=["curl", "wget", "nc"]),
+        ],
+        requires_sidecar=False,
+        tags=["blind", "http", "oob", "no-internet", "data-exfil"],
+    ),
+    ChainEntry(
+        id="blind_smb_oob",
+        category="blind",
+        sub_category="SMB/UNC",
+        name="SMB UNC 路径外带",
+        description="Windows 场景：访问 \\\\OOBserver\\share 触发 NTLM 捕获",
+        params=[
+            ParamSpec("oob_ip", "string", required=True, description="OOBserver IP"),
+            ParamSpec("share", "string", default="share"),
+        ],
+        requires_sidecar=False,
+        tags=["blind", "smb", "ntlm", "windows", "unc"],
+    ),
+    ChainEntry(
+        id="blind_dns_internal",
+        category="blind",
+        sub_category="DNS 内网权威",
+        name="内网 DNS 解析外带",
+        description="把数据编入 DNS 子域名查询，OOBserver 的权威 DNS 服务器（OOBX_DNS_ENABLED）接收",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("data_expr", "string", default="$(hostname)"),
+            ParamSpec("dns_zone", "string", default="oob.local"),
+        ],
+        requires_sidecar=False,
+        tags=["blind", "dns", "internal", "no-internet", "data-exfil"],
+    ),
+    ChainEntry(
+        id="blind_file_write",
+        category="blind",
+        sub_category="文件写入",
+        name="写文件验证 RCE",
+        description="无外带条件：写入 web 目录可访问文件（如 /webroot/oob.txt）通过 HTTP 读取验证",
+        params=[
+            ParamSpec("path", "string", default="/tmp/oob.txt"),
+            ParamSpec("content", "string", default="oob_rce_ok"),
+        ],
+        requires_sidecar=False,
+        tags=["blind", "file-write", "no-network", "no-echo"],
+    ),
+    ChainEntry(
+        id="blind_ceye_like",
+        category="blind",
+        sub_category="DNS Token",
+        name="OOBserver DNS Token（CEYE 替代）",
+        description="无外网 DNS：用 OOBserver 本地权威 DNS 替代 CEYE/dnslog；token 作子域名标识",
+        params=[
+            ParamSpec("token", "string", required=True),
+            ParamSpec("dns_zone", "string", default="oob.local"),
+        ],
+        requires_sidecar=False,
+        tags=["blind", "dns", "ceye", "dnslog", "no-internet"],
+    ),
+]
+
+CATALOG_BY_ID: dict[str, ChainEntry] = {e.id: e for e in CATALOG}

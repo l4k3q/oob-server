@@ -1,0 +1,70 @@
+/* Global utilities replacing UnoCSS */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: #f5f7fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif; }
+
+/* flex */
+.flex { display: flex; }
+.flex-1 { flex: 1; }
+.flex-col { flex-direction: column; }
+.flex-shrink-0 { flex-shrink: 0; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+/* spacing */
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+.ml-1 { margin-left: 4px; }
+.ml-2 { margin-left: 8px; }
+.ml-4 { margin-left: 16px; }
+.mr-1 { margin-right: 4px; }
+.mr-4 { margin-right: 16px; }
+.p-3 { padding: 12px; }
+.pr-4 { padding-right: 16px; }
+/* sizing */
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+.overflow-auto { overflow: auto; }
+.overflow-hidden { overflow: hidden; }
+/* text */
+.text-center { text-align: center; }
+.text-sm { font-size: 13px; }
+.text-xs { font-size: 11px; }
+.font-bold { font-weight: 700; }
+.font-medium { font-weight: 500; }
+.font-mono { font-family: 'Cascadia Code','Fira Code',Consolas,monospace; }
+/* color */
+.text-gray-400 { color: #bfbfbf; }
+.text-gray-500 { color: #8c8c8c; }
+.text-gray-600 { color: #595959; }
+/* layout */
+.bg-white { background: #fff; }
+.rounded-lg { border-radius: 8px; }
+.shadow-lg { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.cursor-pointer { cursor: pointer; }
+.inline-flex { display: inline-flex; }
+.flex-wrap { flex-wrap: wrap; }
+.relative { position: relative; }
+.sticky { position: sticky; }
+.top-0 { top: 0; }
+.z-100 { z-index: 100; }
+.border-none { border: none !important; }
+
+/* Ant Design global overrides */
+.ant-layout { background: #f5f7fa; }
+.ant-layout-header { background: #fff !important; padding: 0 !important; }
+.ant-menu-horizontal { border-bottom: none !important; background: transparent !important; }
+.ant-menu-horizontal > .ant-menu-item-selected { color: #1677ff; }
+.ant-card { border-radius: 8px; }
+.ant-card-head { border-bottom: 1px solid #f0f0f0; }
+.ant-table-thead > tr > th { background: #fafafa; font-weight: 500; }
+.ant-form-item-label > label { font-size: 13px; color: #595959; }
+.ant-descriptions-item-label { font-size: 12px; background: #fafafa; }
+.ant-descriptions-item-content { font-size: 12px; }

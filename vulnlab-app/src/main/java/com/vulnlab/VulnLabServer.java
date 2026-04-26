@@ -1,0 +1,168 @@
+package com.vulnlab;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.io.*;
+import java.net.InetSocketAddress;
+import java.util.concurrent.Executors;
+
+/**
+ * Minimal vulnerable lab server — intentionally vulnerable for testing.
+ * Endpoints:
+ *   POST /deser      — Java ObjectInputStream deserialization (CC6/CB1/etc.)
+ *   POST /fastjson   — Fastjson 1.2.24 JSON parse (JNDI RCE)
+ *   POST /xstream    — XStream 1.4.17 XML parse (CVE-2021-39144)
+ *   POST /hessian    — Hessian deserialization endpoint
+ *   POST /hessian2   — Hessian2 deserialization endpoint
+ *   GET  /log4shell  — Log4j2 JNDI via User-Agent header (CVE-2021-44228)
+ *   GET  /health     — health check
+ */
+public class VulnLabServer {
+    private static final Logger log = LogManager.getLogger(VulnLabServer.class);
+
+    public static void main(String[] args) throws Exception {
+        int port = args.length > 0 ? Integer.parseInt(args[0]) : 8888;
+        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+        server.createContext("/deser",    new DeserHandler());
+        server.createContext("/fastjson", new FastjsonHandler());
+        server.createContext("/xstream",  new XStreamHandler());
+        server.createContext("/hessian",  new HessianHandler(false));
+        server.createContext("/hessian2", new HessianHandler(true));
+        server.createContext("/log4shell", new Log4ShellHandler());
+        server.createContext("/health",   new HealthHandler());
+        server.setExecutor(Executors.newCachedThreadPool());
+        server.start();
+        System.out.println("[VulnLab] Listening on port " + port);
+        System.out.println("  /deser      Java ObjectInputStream RCE (CC6/CB1/Hessian/C3P0 chains)");
+        System.out.println("  /fastjson   Fastjson 1.2.24 JNDI RCE");
+        System.out.println("  /xstream    XStream 1.4.17 RCE");
+        System.out.println("  /hessian    Hessian deserialization");
+        System.out.println("  /hessian2   Hessian2 deserialization");
+        System.out.println("  /log4shell  Log4j2 CVE-2021-44228 via User-Agent");
+        System.out.println("  /health     health check");
+    }
+
+    static byte[] readBody(HttpExchange ex) throws IOException {
+        try (ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
+            byte[] chunk = new byte[4096];
+            int n;
+            while ((n = ex.getRequestBody().read(chunk)) != -1) buf.write(chunk, 0, n);
+            return buf.toByteArray();
+        }
+    }
+
+    static void respond(HttpExchange ex, int code, String body) throws IOException {
+        byte[] b = body.getBytes("UTF-8");
+        ex.sendResponseHeaders(code, b.length);
+        ex.getResponseBody().write(b);
+        ex.getResponseBody().close();
+    }
+
+    // ── Handlers ──────────────────────────────────────────────────────────────
+
+    static class DeserHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            byte[] body = readBody(ex);
+            System.out.println("[deser] Received " + body.length + " bytes from " + ex.getRemoteAddress());
+            try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(body))) {
+                Object obj = ois.readObject();
+                // Trigger C3P0 chain: calling getConnection()/getPooledConnection() fires
+                // parseUserOverridesAsString() → secondary deser. Run in background thread
+                // so the HTTP response is not blocked by C3P0 pool-init timeout.
+                if (obj instanceof javax.sql.DataSource) {
+                    final javax.sql.DataSource ds = (javax.sql.DataSource) obj;
+                    new Thread(() -> {
+                        try { ds.getConnection(); } catch (Throwable ignored) {}
+                    }, "c3p0-trigger").start();
+                } else if (obj instanceof javax.sql.ConnectionPoolDataSource) {
+                    // WrapperConnectionPoolDataSource implements ConnectionPoolDataSource, not DataSource
+                    final javax.sql.ConnectionPoolDataSource cpds = (javax.sql.ConnectionPoolDataSource) obj;
+                    new Thread(() -> {
+                        try { cpds.getPooledConnection(); } catch (Throwable ignored) {}
+                    }, "c3p0-trigger").start();
+                }
+                respond(ex, 200, "OK: " + (obj == null ? "null" : obj.getClass().getName()));
+            } catch (Throwable t) {
+                System.out.println("[deser] Exception: " + t.getMessage());
+                respond(ex, 200, "EX: " + t.getMessage());
+            }
+        }
+    }
+
+    static class FastjsonHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            byte[] body = readBody(ex);
+            String json = new String(body, "UTF-8");
+            System.out.println("[fastjson] Received: " + json.substring(0, Math.min(json.length(), 200)));
+            try {
+                Object obj = com.alibaba.fastjson.JSON.parseObject(json);
+                respond(ex, 200, "OK: " + obj);
+            } catch (Throwable t) {
+                System.out.println("[fastjson] Exception: " + t.getMessage());
+                respond(ex, 200, "EX: " + t.getMessage());
+            }
+        }
+    }
+
+    static class XStreamHandler implements HttpHandler {
+        private final com.thoughtworks.xstream.XStream xs;
+        XStreamHandler() {
+            xs = new com.thoughtworks.xstream.XStream();
+            // No security restrictions — intentionally vulnerable
+        }
+        public void handle(HttpExchange ex) throws IOException {
+            byte[] body = readBody(ex);
+            String xml = new String(body, "UTF-8");
+            System.out.println("[xstream] Received " + body.length + " bytes");
+            try {
+                Object obj = xs.fromXML(xml);
+                respond(ex, 200, "OK: " + obj);
+            } catch (Throwable t) {
+                System.out.println("[xstream] Exception: " + t.getMessage());
+                respond(ex, 200, "EX: " + t.getMessage());
+            }
+        }
+    }
+
+    static class HessianHandler implements HttpHandler {
+        private final boolean hessian2;
+        HessianHandler(boolean hessian2) { this.hessian2 = hessian2; }
+        public void handle(HttpExchange ex) throws IOException {
+            byte[] body = readBody(ex);
+            System.out.println("[hessian" + (hessian2?"2":"") + "] Received " + body.length + " bytes");
+            try {
+                com.caucho.hessian.io.AbstractHessianInput in;
+                if (hessian2) {
+                    in = new com.caucho.hessian.io.Hessian2Input(new ByteArrayInputStream(body));
+                } else {
+                    in = new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
+                }
+                Object obj = in.readObject();
+                respond(ex, 200, "OK: " + obj);
+            } catch (Throwable t) {
+                System.out.println("[hessian] Exception: " + t.getMessage());
+                respond(ex, 200, "EX: " + t.getMessage());
+            }
+        }
+    }
+
+    static class Log4ShellHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            String ua = ex.getRequestHeaders().getFirst("User-Agent");
+            if (ua == null) ua = "(no user-agent)";
+            System.out.println("[log4shell] User-Agent: " + ua);
+            log.error("User-Agent: {}", ua);  // Triggers Log4Shell if UA contains ${jndi:...}
+            respond(ex, 200, "Logged: " + ua);
+        }
+    }
+
+    static class HealthHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\"]}");
+        }
+    }
+}

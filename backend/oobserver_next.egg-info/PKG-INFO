@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: oobserver-next
+Version: 0.1.0
+Summary: OOB exploitation platform: multi-protocol callback + JNDI/memshell payload factory + rebinding C2
+Requires-Python: >=3.10
+Requires-Dist: fastapi>=0.110
+Requires-Dist: uvicorn[standard]>=0.27
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: aiosqlite>=0.19
+Requires-Dist: asyncpg>=0.29
+Requires-Dist: pydantic>=2.6
+Requires-Dist: pydantic-settings>=2.2
+Requires-Dist: python-jose[cryptography]>=3.3
+Requires-Dist: passlib[bcrypt]>=1.7
+Requires-Dist: python-multipart>=0.0.9
+Requires-Dist: httpx>=0.27
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: dnslib>=0.9.24
+Requires-Dist: websockets>=12.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+Requires-Dist: ruff>=0.3; extra == "dev"
