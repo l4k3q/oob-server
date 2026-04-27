@@ -4,8 +4,9 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth.router import router as auth_router
@@ -134,8 +135,32 @@ def create_app() -> FastAPI:
 
     # Serve built frontend LAST so API routes take precedence
     frontend_dist = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+    frontend_index = os.path.join(frontend_dist, "index.html")
+
     if os.path.isdir(frontend_dist):
-        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+        # Mount static assets (JS/CSS/img) under /assets so they resolve correctly
+        assets_dir = os.path.join(frontend_dist, "assets")
+        if os.path.isdir(assets_dir):
+            app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+        # SPA fallback: any path not matched by API routes returns index.html
+        # This allows Vue Router to handle client-side routing (/dashboard, /tokens, etc.)
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(request: Request, full_path: str) -> FileResponse:
+            # Try serving the exact file first (favicon.ico, robots.txt, etc.)
+            candidate = os.path.join(frontend_dist, full_path)
+            if os.path.isfile(candidate):
+                return FileResponse(candidate)
+            # All other paths → index.html (Vue Router handles the route)
+            return FileResponse(frontend_index)
+    else:
+        # Frontend not built yet — return helpful message
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def frontend_not_built(request: Request, full_path: str) -> JSONResponse:
+            return JSONResponse(
+                {"detail": "Frontend not built. Run: cd frontend && npm install && npm run build"},
+                status_code=503,
+            )
 
     return app
 
