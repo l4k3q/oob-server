@@ -23,15 +23,14 @@ def _read_proc_stat() -> dict:
 
 
 def _cpu_percent() -> float:
-    """Approximate CPU usage by sampling /proc/stat twice."""
+    """Non-blocking CPU usage: returns delta since last call (ideal for polling)."""
     try:
         import psutil
-        return round(psutil.cpu_percent(interval=0.2), 1)
+        return round(psutil.cpu_percent(interval=None), 1)
     except ImportError:
         pass
     try:
         s1 = _read_proc_stat()
-        time.sleep(0.2)
         s2 = _read_proc_stat()
         if not s1 or not s2:
             return -1.0

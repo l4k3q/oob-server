@@ -40,7 +40,7 @@
     <div class="sys-card" style="margin-bottom:16px">
       <div class="sys-header">
         <span class="sys-title"><CloudServerOutlined style="margin-right:6px"/>服务器状态</span>
-        <a-button size="small" @click="loadSysInfo" :loading="sysLoading">刷新</a-button>
+        <a-badge status="processing" text="实时" style="font-size:11px;color:#8c8c8c" />
       </div>
       <a-row :gutter="16" style="padding:12px 16px">
         <a-col :span="8">
@@ -205,7 +205,7 @@ onMounted(() => {
   loadStats()
   loadSysInfo()
   statsTimer = setInterval(loadStats, 15000)
-  sysTimer   = setInterval(loadSysInfo, 30000)
+  sysTimer   = setInterval(loadSysInfo, 4000)
 })
 onUnmounted(() => {
   ws?.close()
