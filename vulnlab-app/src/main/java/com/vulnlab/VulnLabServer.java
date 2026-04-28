@@ -131,17 +131,37 @@ public class VulnLabServer {
     static class HessianHandler implements HttpHandler {
         private final boolean hessian2;
         HessianHandler(boolean hessian2) { this.hessian2 = hessian2; }
+
+        private com.caucho.hessian.io.AbstractHessianInput newInput(byte[] body) {
+            ByteArrayInputStream bais = new ByteArrayInputStream(body);
+            return hessian2
+                ? new com.caucho.hessian.io.Hessian2Input(bais)
+                : new com.caucho.hessian.io.HessianInput(bais);
+        }
+
+        // java-chains wraps gadgets in a Hessian RPC call frame (method call + args).
+        // Try readMethod() + readObject() first; if that fails, fall back to raw readObject().
+        private Object deserHessian(byte[] body) throws Exception {
+            try {
+                com.caucho.hessian.io.AbstractHessianInput rpc = newInput(body);
+                rpc.readMethod();
+                return rpc.readObject();
+            } catch (Throwable ignored) {}
+            return newInput(body).readObject();
+        }
+
         public void handle(HttpExchange ex) throws IOException {
             byte[] body = readBody(ex);
-            System.out.println("[hessian" + (hessian2?"2":"") + "] Received " + body.length + " bytes");
+            System.out.println("[hessian" + (hessian2?"2":"") + "] Received " + body.length + " bytes from " + ex.getRemoteAddress());
             try {
-                com.caucho.hessian.io.AbstractHessianInput in;
-                if (hessian2) {
-                    in = new com.caucho.hessian.io.Hessian2Input(new ByteArrayInputStream(body));
-                } else {
-                    in = new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
+                Object obj = deserHessian(body);
+                if (obj instanceof javax.sql.DataSource) {
+                    final javax.sql.DataSource ds = (javax.sql.DataSource) obj;
+                    new Thread(() -> { try { ds.getConnection(); } catch (Throwable ignored) {} }, "c3p0-trigger").start();
+                } else if (obj instanceof javax.sql.ConnectionPoolDataSource) {
+                    final javax.sql.ConnectionPoolDataSource cpds = (javax.sql.ConnectionPoolDataSource) obj;
+                    new Thread(() -> { try { cpds.getPooledConnection(); } catch (Throwable ignored) {} }, "c3p0-trigger").start();
                 }
-                Object obj = in.readObject();
                 respond(ex, 200, "OK: " + obj);
             } catch (Throwable t) {
                 System.out.println("[hessian] Exception: " + t.getMessage());

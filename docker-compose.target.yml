@@ -42,6 +42,11 @@ services:
       - vulnlab
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      # Enable remote class loading via LDAP codebase (required for memshell injection)
+      JAVA_TOOL_OPTIONS: >-
+        -Dcom.sun.jndi.ldap.object.trustURLCodebase=true
+        -Dcom.sun.jndi.rmi.object.trustURLCodebase=true
     labels:
       vuln: "Log4Shell CVE-2021-44228"
       payload: "log4shell_basic"
