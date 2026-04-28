@@ -27,10 +27,12 @@ fi
 # ── Start bytecode-service sidecar ────────────────────────────────────────────
 echo "[entrypoint] Starting bytecode-service sidecar..."
 exec java \
+    -Dorg.apache.commons.collections.enableUnsafeSerialization=true \
     --add-opens java.sql.rowset/com.sun.rowset=ALL-UNNAMED \
     --add-opens java.base/java.lang=ALL-UNNAMED \
     --add-opens java.base/java.lang.reflect=ALL-UNNAMED \
     --add-opens java.base/java.util=ALL-UNNAMED \
+    --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.trax=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.runtime=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xml.internal.dtm=ALL-UNNAMED \
