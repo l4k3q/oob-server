@@ -88,8 +88,8 @@
           </a-select>
         </a-form-item>
         <a-form-item
-          v-if="['jndi_ldap','jndi_rmi','serialize'].includes(form.deliver)"
-          label="OOB Token（JNDI / serialize 投递必填）"
+          v-if="['jndi_ldap','jndi_rmi'].includes(form.deliver)"
+          label="OOB Token（JNDI 投递必填）"
         >
           <a-select v-model:value="form.token" allow-clear placeholder="选择 Token" style="width:100%">
             <a-select-option v-for="t in tokens" :key="t.token" :value="t.token">
