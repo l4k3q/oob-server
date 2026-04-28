@@ -20,7 +20,7 @@
               │ HTTP 代理
               ▼
         Sidecar (Spring Boot) :8711         ← 82 条 Payload 链
-        └── java-chains (内嵌) :8011        ← 19 条增强链
+        └── java-chains (内嵌) :8011        ← 48 条增强链
 ```
 
 | 组件 | 技术栈 | 端口 |
@@ -68,20 +68,21 @@ docker compose ps
 ### Fastjson / XStream / Shiro / C3P0
 `fastjson_jdbcrowset` · `fastjson_jdbcrowset_v2` · `fastjson_bcel` · `xstream_eventhandler` · `xstream_imageio` · `shiro_cbc` · `shiro_gcm` · `c3p0_jndi` · `c3p0_wrapperds`
 
-### java-chains 增强链（`jchains_*`，19 条）
-| Chain ID | 协议 | 触发方式 |
-|---|---|---|
-| `jchains_hessian1_spring` | Hessian1 | JNDI (`jndi_url`) |
-| `jchains_hessian1_exec` | Hessian1 | 直接执行 (`cmd`) |
-| `jchains_hessian2_spring` | Hessian2 | JNDI (`jndi_url`) |
-| `jchains_hessian2_exec` | Hessian2 | 直接执行 (`cmd`) |
-| `jchains_fastjson` / `jchains_fastjson_jndi` | Fastjson | JNDI (`jndi_url`) |
-| `jchains_fastjson_bcel` | Fastjson | BCEL 字节码 (`cmd`) |
-| `jchains_xstream` / `jchains_xstream_jndi` | XStream | JNDI (`jndi_url`) |
-| `jchains_xstream_exec` | XStream | 直接执行 (`cmd`) |
-| `jchains_shiro_cbc` | Shiro CBC | 直接执行 (`cmd`) |
-| `jchains_cc1` ~ `jchains_cc6` / `jchains_native_cc6` | Java 反序列化 | 直接执行 (`cmd`) |
-| `jchains_cb1` / `jchains_native_cb1` | Java 反序列化 | 直接执行 (`cmd`) |
+### java-chains 增强链（`jchains_*`，48 条）
+
+**Hessian1（8）**: `jchains_hessian1_spring` · `jchains_hessian1_spring2` · `jchains_hessian1_spring_exec` · `jchains_hessian1_exec` · `jchains_hessian1_bcel` · `jchains_hessian1_rome1` · `jchains_hessian1_rome2` · `jchains_hessian1_secondary`
+
+**Hessian2（10）**: `jchains_hessian2_spring` · `jchains_hessian2_spring2` · `jchains_hessian2_spring_exec` · `jchains_hessian2_exec` · `jchains_hessian2_bcel` · `jchains_hessian2_rome1` · `jchains_hessian2_rome2` · `jchains_hessian2_secondary` · `jchains_hessian2_tostring_xbean` · `jchains_hessian2_tostring_jackson`
+
+**Fastjson（4）**: `jchains_fastjson` / `jchains_fastjson_jndi` · `jchains_fastjson_bcel` · `jchains_fastjson_c3p0_h2`
+
+**XStream（3）**: `jchains_xstream` / `jchains_xstream_jndi` · `jchains_xstream_exec`
+
+**Java 反序列化（14）**: `jchains_cc1` ~ `jchains_cc4` · `jchains_cc6` / `jchains_native_cc6` · `jchains_cb1` / `jchains_native_cb1` · `jchains_native_cb2` · `jchains_native_cb1_jndi` · `jchains_native_jackson` · `jchains_native_jdk17_1` · `jchains_native_jdk17_2` · `jchains_native_c3p0_el` · `jchains_native_c3p0_ldap` · `jchains_native_k1_secondary`
+
+**JNDI ResourceRef（4）**: `jchains_jndi_tomcat_el` · `jchains_jndi_groovy` · `jchains_jndi_snakeyaml` · `jchains_jndi_beanshell`
+
+**其他（3）**: `jchains_shiro_cbc` · `jchains_h2_jdbc` · `jchains_blazeds_axis2`
 
 ### OOB 检测 / JNDI 触发（纯 Python）
 `jndi_ldap_basic` · `jndi_rmi_basic` · `exfil_log4j` · `exfil_fastjson` · `exfil_snakeyaml` · `exfil_xstream` · `blind_*` 等
