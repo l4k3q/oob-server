@@ -55,6 +55,12 @@
             <a-select v-if="p.type==='select'" v-model:value="params[p.name]" style="width:100%">
               <a-select-option v-for="o in p.options" :key="o" :value="o">{{ o }}</a-select-option>
             </a-select>
+            <a-select v-else-if="p.name==='token'" v-model:value="params[p.name]" allow-clear placeholder="选择 Token" style="width:100%">
+              <a-select-option v-for="t in tokens" :key="t.token" :value="t.token">
+                <span style="font-family:monospace;font-size:12px">{{ t.token }}</span>
+                <span v-if="t.label" style="color:#8c8c8c;font-size:11px"> — {{ t.label }}</span>
+              </a-select-option>
+            </a-select>
             <a-input v-else-if="p.type==='string'" v-model:value="params[p.name]" :placeholder="p.description||p.name" />
             <a-input-number v-else-if="p.type==='int'" v-model:value="params[p.name]" style="width:100%" />
           </a-form-item>
@@ -152,7 +158,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { ThunderboltOutlined } from '@ant-design/icons-vue'
-import { getPayloadCatalog, generatePayload } from '../api'
+import { getPayloadCatalog, generatePayload, listTokens } from '../api'
 
 const CAT_COLOR: Record<string, string> = {
   serialize: 'red', jndi: 'orange', exfil: 'blue', memshell: 'purple', blind: 'green'
@@ -169,6 +175,7 @@ const categories = [
 ]
 
 const catalog = ref<any[]>([])
+const tokens = ref<any[]>([])
 const selectedCat = ref('serialize')
 const selected = ref<any>(null)
 const params = ref<Record<string, any>>({})
@@ -254,7 +261,10 @@ function download() {
 }
 
 onMounted(async () => {
-  catalog.value = (await getPayloadCatalog()).data
+  [catalog.value, tokens.value] = await Promise.all([
+    getPayloadCatalog().then(r => r.data),
+    listTokens().then(r => r.data),
+  ])
 })
 </script>
 
