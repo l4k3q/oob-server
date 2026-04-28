@@ -1,9 +1,9 @@
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 
 # Java 8 for ysoserial/marshalsec subprocess + curl for healthcheck
 RUN apt-get update -q && \
-    apt-get install -y --no-install-recommends openjdk-8-jre-headless curl && \
+    apt-get install -y --no-install-recommends openjdk-8-jdk-headless curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Use pre-built JAR (avoids Maven Central network requirement at build time)

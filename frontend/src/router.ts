@@ -16,6 +16,7 @@ const router = createRouter({
         { path: 'tokens',         component: () => import('./views/Tokens.vue') },
         { path: 'payload-builder',component: () => import('./views/PayloadBuilder.vue') },
         { path: 'memshell-lab',   component: () => import('./views/MemshellLab.vue') },
+        { path: 'compile-lab',    component: () => import('./views/CompileLab.vue') },
         { path: 'agents',         component: () => import('./views/Agents.vue') },
         { path: 'events',         component: () => import('./views/Events.vue') },
       ]

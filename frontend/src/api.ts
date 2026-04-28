@@ -51,6 +51,10 @@ export const generatePayload = (data: any) => api.post('/payloads/generate', dat
 export const getMemshellCatalog = () => api.get('/memshells/catalog')
 export const generateMemshell = (data: any) => api.post('/memshells/generate', data)
 
+// Compile
+export const compileJava = (data: { source: string; class_name?: string }) =>
+  api.post('/compile', data)
+
 // Rebind
 export const setRebind = (token: string, data: any) => api.post(`/rebind/${token}/set`, data)
 export const clearRebind = (token: string) => api.delete(`/rebind/${token}/clear`)

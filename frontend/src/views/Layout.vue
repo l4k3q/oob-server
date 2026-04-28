@@ -18,6 +18,7 @@
           <a-menu-item key="/events"><ThunderboltOutlined />回连事件</a-menu-item>
           <a-menu-item key="/payload-builder"><CodeOutlined />Payload 构造</a-menu-item>
           <a-menu-item key="/memshell-lab"><BugOutlined />内存马工坊</a-menu-item>
+          <a-menu-item key="/compile-lab"><ExperimentOutlined />编译 Class</a-menu-item>
           <a-menu-item key="/agents"><DesktopOutlined />Agent (C2)</a-menu-item>
         </a-menu>
         <div class="flex items-center gap-3 mr-4">
@@ -86,7 +87,7 @@ import { message } from 'ant-design-vue'
 import {
   DashboardOutlined, FolderOutlined, KeyOutlined, CodeOutlined,
   DesktopOutlined, UserOutlined, WifiOutlined, CloseOutlined,
-  ThunderboltFilled, ThunderboltOutlined, BugOutlined
+  ThunderboltFilled, ThunderboltOutlined, BugOutlined, ExperimentOutlined
 } from '@ant-design/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
@@ -106,6 +107,7 @@ const NAV_MAP: Record<string, { label: string; icon: any }> = {
   '/events':          { label: '回连事件',   icon: ThunderboltOutlined },
   '/payload-builder': { label: 'Payload 构造', icon: CodeOutlined },
   '/memshell-lab':    { label: '内存马工坊', icon: BugOutlined },
+  '/compile-lab':     { label: '编译 Class', icon: ExperimentOutlined },
   '/agents':          { label: 'Agent C2',  icon: DesktopOutlined },
 }
 
