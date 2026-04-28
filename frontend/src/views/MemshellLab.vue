@@ -87,7 +87,10 @@
             </a-select-opt-group>
           </a-select>
         </a-form-item>
-        <a-form-item label="OOB Token（JNDI 投递时使用）">
+        <a-form-item
+          v-if="['jndi_ldap','jndi_rmi','serialize'].includes(form.deliver)"
+          label="OOB Token（JNDI / serialize 投递必填）"
+        >
           <a-select v-model:value="form.token" allow-clear placeholder="选择 Token" style="width:100%">
             <a-select-option v-for="t in tokens" :key="t.token" :value="t.token">
               <span style="font-family:monospace;font-size:12px">{{ t.token }}</span>
