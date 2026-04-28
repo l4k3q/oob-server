@@ -22,7 +22,8 @@ public class ChainRegistry {
             HessianChainHandler hessian,
             C3P0ChainHandler c3p0,
             XStreamChainHandler xstream,
-            FastjsonChainHandler fastjson) {
+            FastjsonChainHandler fastjson,
+            JavaChainsProxyHandler javaChains) {
 
         // ── ysoserial catalog short IDs ──────────────────────────────────────
         Map<String, String> catalogIds = Map.ofEntries(
@@ -88,18 +89,9 @@ public class ChainRegistry {
         handlers.put("fastjson_jdbcrowset_v2", fastjson);
         handlers.put("fastjson_bcel",          fastjson);
 
-        // ── jchains_* aliases → direct native implementations ────────────────
-        // These mirror the java-chains chain IDs, implemented natively above
-        handlers.put("jchains_hessian1_spring", hessian);
-        handlers.put("jchains_hessian1_rome",   hessian);
-        handlers.put("jchains_hessian2_spring", hessian);
-        handlers.put("jchains_hessian2_rome",   hessian);
-        handlers.put("jchains_shiro_cbc",       shiroCombined);
-        handlers.put("jchains_shiro_gcm",       shiroCombined);
-        handlers.put("jchains_native_cc6",      ysoserial);
-        handlers.put("jchains_native_cb1",      ysoserial);
-        handlers.put("jchains_xstream",         xstream);
-        handlers.put("jchains_fastjson",        fastjson);
+        // ── jchains_* → JavaChainsProxyHandler (backed by java-chains service) ─
+        // Requires java-chains running at javachains.url (default :8011) with CHAINS_AUTH=false
+        javaChains.chainIds().forEach(id -> handlers.put(id, javaChains));
     }
 
     public ChainHandler get(String chainId) {
