@@ -258,6 +258,23 @@ KNOWN_SKIP = {
     "jchains_hessian2_tostring_xbean":   "java-chains Exec bug; Tomcat EL engine absent in vulnlab",
     # JRMPClient: needs a running JRMPListener to send back a gadget payload
     "ysoserial_jrmp_client":       "Needs active JRMP listener; no JRMPListener configured",
+    # Groovy1: groovy-*.jar not on vulnlab classpath
+    "ysoserial_groovy1":           "groovy-*.jar not on target classpath",
+    # java-chains BytecodeConvert+Exec bug also affects Fastjson/XStream/H2 exec chains
+    "jchains_fastjson_bcel":       "java-chains BytecodeConvert+Exec bug (cmd hardcoded 'calc')",
+    "jchains_fastjson_c3p0_h2":    "java-chains BytecodeConvert+Exec bug (H2 + Exec)",
+    "jchains_xstream_exec":        "java-chains BytecodeConvert+Exec bug (XsltJdk + Exec)",
+    # fastjson_bcel uses com.sun.org.apache.bcel ClassLoader which is blocked in FastJson ≥1.2.25
+    "fastjson_bcel":               "BCEL driverClassLoader blocked in FastJson ≥1.2.25; target uses 1.2.47",
+    # C3P0 LdapClassLoader fails to acquire JNDI InitialContext in restricted JVM config
+    "jchains_native_c3p0_ldap":   "C3P0 JNDI InitialContext creation fails (no LDAP provider in env)",
+    # SpringExec FactoryBean fails on Spring 5.x — gadget requires Spring 4.x
+    "jchains_hessian1_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x on target",
+    "jchains_hessian2_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x on target",
+    # Shiro containers not started in test environment
+    "shiro_cbc":        "shiro container not running",
+    "shiro_gcm":        "shiro container not running",
+    "jchains_shiro_cbc":"shiro container not running",
 }
 
 
@@ -821,9 +838,11 @@ def main():
                 "jchains_hessian1_secondary","jchains_hessian1_bcel"]:
         test_hessian_chain(cid, version=1)
 
+    # marshalsec.Hessian outputs Hessian1 format → send to /hessian endpoint
+    test_hessian_chain("hessian2_spring", version=1)
+
     print("\n[*] Section 4: Hessian2 chains (→ /hessian2)")
-    for cid in ["hessian2_spring",
-                "jchains_hessian2_spring","jchains_hessian2_spring2",
+    for cid in ["jchains_hessian2_spring","jchains_hessian2_spring2",
                 "jchains_hessian2_spring_exec","jchains_hessian2_exec",
                 "jchains_hessian2_rome1","jchains_hessian2_rome2",
                 "jchains_hessian2_secondary","jchains_hessian2_bcel",

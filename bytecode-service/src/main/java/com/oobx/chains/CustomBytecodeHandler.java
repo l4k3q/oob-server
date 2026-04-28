@@ -47,8 +47,14 @@ public class CustomBytecodeHandler implements ChainHandler {
     }
 
     private byte[] generateCmdExec(String className, String cmd) throws Exception {
+        return generateCmdExecWithVersion(className, cmd, 52);
+    }
+
+    private byte[] generateCmdExecWithVersion(String className, String cmd, int majorVersion) throws Exception {
         ClassPool pool = buildPool("javax");
         CtClass cc = pool.makeClass(className);
+        cc.getClassFile().setMajorVersion(majorVersion);
+        cc.getClassFile().setMinorVersion(0);
         String body = cmd.isEmpty()
                 ? "{}"
                 : String.format(

