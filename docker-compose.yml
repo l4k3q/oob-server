@@ -39,14 +39,14 @@ services:
     ports:
       - "8711:8711"
     environment:
-      # Java 8 is installed in the image at /usr/lib/jvm/java-8-openjdk-amd64/bin/java
       YSOSERIAL_JAVA: /usr/lib/jvm/java-8-openjdk-amd64/bin/java
+      JAVACHAINS_URL: http://127.0.0.1:8011
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8711/chains"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 6
+      start_period: 60s
 
   frontend:
     build:
