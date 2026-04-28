@@ -13,16 +13,28 @@
         >{{ cat.label }}</div>
       </div>
 
-      <!-- Chain picker grouped by sub_category -->
+      <!-- Chain picker: sub_category dropdown + flat chain list -->
       <div class="ms-section-title">选择利用链</div>
       <div v-if="catChains.length===0" style="color:#bfbfbf;font-size:12px;padding:4px;margin-bottom:14px">
         请先选择类型
       </div>
-      <template v-for="group in catGroups" :key="group.sub">
-        <div class="sub-cat-label">{{ group.sub }}</div>
+      <template v-else>
+        <a-select
+          v-model:value="selectedSub"
+          style="width:100%;margin-bottom:10px"
+          size="small"
+          placeholder="全部分类"
+          allow-clear
+          @change="selected=null;result=null"
+        >
+          <a-select-option value="">全部</a-select-option>
+          <a-select-option v-for="sub in catSubCategories" :key="sub" :value="sub">
+            {{ sub }} <span style="color:#bfbfbf">({{ subCount(sub) }})</span>
+          </a-select-option>
+        </a-select>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
           <div
-            v-for="c in group.chains"
+            v-for="c in filteredChains"
             :key="c.id"
             :class="['type-btn', selected?.id === c.id ? 'active' : '']"
             @click="pick(c)"
@@ -184,20 +196,31 @@ const result = ref<any>(null)
 const quickSearch = ref('')
 const searchResults = ref<any[]>([])
 
+const selectedSub = ref('')
+
 const catChains = computed(() =>
   catalog.value.filter(c => c.category === selectedCat.value)
 )
 
-const catGroups = computed(() => {
-  const order: string[] = []
-  const map: Record<string, any[]> = {}
+const catSubCategories = computed(() => {
+  const seen = new Set<string>()
+  const list: string[] = []
   for (const c of catChains.value) {
     const sub = c.sub_category || '其他'
-    if (!map[sub]) { map[sub] = []; order.push(sub) }
-    map[sub].push(c)
+    if (!seen.has(sub)) { seen.add(sub); list.push(sub) }
   }
-  return order.map(sub => ({ sub, chains: map[sub] }))
+  return list
 })
+
+const filteredChains = computed(() =>
+  selectedSub.value
+    ? catChains.value.filter(c => c.sub_category === selectedSub.value)
+    : catChains.value
+)
+
+function subCount(sub: string) {
+  return catChains.value.filter(c => c.sub_category === sub).length
+}
 
 const isBin = computed(() =>
   result.value?.content_type === 'application/java-vm' ||
@@ -206,6 +229,7 @@ const isBin = computed(() =>
 
 function selectCat(cat: string) {
   selectedCat.value = cat
+  selectedSub.value = ''
   selected.value = null
   result.value = null
 }
