@@ -707,7 +707,7 @@ CATALOG: list[ChainEntry] = [
     # -- Hessian1 --
     ChainEntry(
         id="jchains_hessian1_spring",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 Spring JNDI",
         name="Hessian1 Spring JNDI1 (PartiallyComparable)",
         description="Hessian1反序列化 — SpringPartiallyComparableAdvisorHolder触发JNDI，适用于Dubbo/HSF等Hessian RPC服务",
@@ -718,7 +718,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian1_exec",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 JDK原生执行",
         name="Hessian1 JDK native XSLT exec",
         description="Hessian1反序列化 — XsltOnlyJdk + JsConvert，无需Spring依赖，直接命令执行",
@@ -728,7 +728,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian1_spring2",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 Spring JNDI2",
         name="Hessian1 Spring JNDI2 (AbstractBeanFactory)",
         description="Hessian1反序列化 — SpringAbstractBeanFactoryPointcutAdvisor触发JNDI",
@@ -738,7 +738,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian1_spring_exec",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 Spring直接执行",
         name="Hessian1 Spring direct exec",
         description="Hessian1反序列化 — SpringAbstractBeanFactoryPointcutAdvisor + SpringExec直接命令执行",
@@ -748,7 +748,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian1_secondary",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 二次反序列化",
         name="Hessian1 SwingLazyValue 二次反序列化",
         description="Hessian1反序列化 — SwingLazyValueUIDefaults触发二次Java原生反序列化，内层使用CB1+TemplatesImpl",
@@ -758,7 +758,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian1_bcel",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 JDK BCEL",
         name="Hessian1 JDK native BCEL exec",
         description="Hessian1反序列化 — ProxyLazyValueUIDefaults + LazyValueWithBcel，利用JDK内置BCEL ClassLoader执行命令",
@@ -768,7 +768,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian1_rome1",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 Rome1 二次反序列化",
         name="Hessian1 Rome1 二次反序列化",
         description="Hessian1反序列化 — Rome1 + SignedObject包装，触发二次反序列化，内层CB1+TemplatesImpl执行命令",
@@ -778,7 +778,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian1_rome2",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian1 Rome2 二次反序列化",
         name="Hessian1 Rome2 二次反序列化",
         description="Hessian1反序列化 — Rome2 + SignedObject包装，触发二次反序列化，内层CB1+TemplatesImpl执行命令",
@@ -790,7 +790,7 @@ CATALOG: list[ChainEntry] = [
     # -- Hessian2 --
     ChainEntry(
         id="jchains_hessian2_spring",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 Spring JNDI",
         name="Hessian2 Spring JNDI1 (PartiallyComparable)",
         description="Hessian2反序列化 — SpringPartiallyComparableAdvisorHolder触发JNDI",
@@ -800,7 +800,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_exec",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 JDK原生执行",
         name="Hessian2 JDK native XSLT exec",
         description="Hessian2反序列化 — XsltOnlyJdk + JsConvert直接命令执行，无Spring依赖",
@@ -810,7 +810,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_spring2",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 Spring JNDI2",
         name="Hessian2 Spring JNDI2 (AbstractBeanFactory)",
         description="Hessian2反序列化 — SpringAbstractBeanFactoryPointcutAdvisor触发JNDI",
@@ -820,7 +820,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_spring_exec",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 Spring直接执行",
         name="Hessian2 Spring direct exec",
         description="Hessian2反序列化 — SpringAbstractBeanFactoryPointcutAdvisor + SpringExec直接执行",
@@ -830,7 +830,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_secondary",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 二次反序列化",
         name="Hessian2 SwingLazyValue 二次反序列化",
         description="Hessian2反序列化 — SwingLazyValueUIDefaults二次反序列化，内层CB1+TemplatesImpl",
@@ -840,7 +840,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_bcel",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 BCEL",
         name="Hessian2 JDK native BCEL exec",
         description="Hessian2反序列化 — ProxyLazyValueUIDefaults + BCEL ClassLoader命令执行",
@@ -850,7 +850,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_rome1",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 Rome1 二次反序列化",
         name="Hessian2 Rome1 二次反序列化",
         description="Hessian2反序列化 — Rome1 + SignedObject二次反序列化，内层CB1执行命令",
@@ -860,7 +860,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_rome2",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2 Rome2 二次反序列化",
         name="Hessian2 Rome2 二次反序列化",
         description="Hessian2反序列化 — Rome2 + SignedObject二次反序列化，内层CB1执行命令",
@@ -872,7 +872,7 @@ CATALOG: list[ChainEntry] = [
     # -- Hessian2ToString --
     ChainEntry(
         id="jchains_hessian2_tostring_xbean",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2ToString XBean",
         name="Hessian2ToString XBean Tomcat EL exec",
         description="Hessian2ToStringPayload — XBeanToString触发TomcatElRef EL表达式执行命令",
@@ -882,7 +882,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_hessian2_tostring_jackson",
-        category="hessian",
+        category="serialize",
         sub_category="Hessian2ToString Jackson 二次反序列化",
         name="Hessian2ToString Jackson 二次反序列化",
         description="Hessian2ToStringPayload — JacksonToString触发二次反序列化，内层Jackson+TemplatesImpl执行命令",
@@ -894,7 +894,7 @@ CATALOG: list[ChainEntry] = [
     # -- Fastjson --
     ChainEntry(
         id="jchains_fastjson",
-        category="java-deser",
+        category="serialize",
         sub_category="Fastjson JNDI",
         name="Fastjson JdbcRowSetImpl JNDI (≤1.2.47)",
         description="Fastjson autoType反序列化 — JdbcRowSetImpl.dataSourceName触发JNDI lookup",
@@ -905,7 +905,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_fastjson_jndi",
-        category="java-deser",
+        category="serialize",
         sub_category="Fastjson JNDI",
         name="Fastjson JdbcRowSetImpl JNDI (别名)",
         description="jchains_fastjson别名 — Fastjson JdbcRowSetImpl JNDI触发",
@@ -915,7 +915,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_fastjson_bcel",
-        category="java-deser",
+        category="serialize",
         sub_category="Fastjson BCEL",
         name="Fastjson BasicDataSource BCEL (≤1.2.24)",
         description="Fastjson autoType — BasicDataSource + BCEL ClassLoader加载字节码，无需JNDI",
@@ -925,7 +925,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_fastjson_c3p0_h2",
-        category="java-deser",
+        category="serialize",
         sub_category="Fastjson C3P0 H2",
         name="Fastjson C3P0 H2 JDBC RCE (≤1.2.47)",
         description="Fastjson autoType — C3P0 + H2 JDBC URL内嵌字节码执行命令，适用于classpath含H2+C3P0的环境",
@@ -937,7 +937,7 @@ CATALOG: list[ChainEntry] = [
     # -- XStream --
     ChainEntry(
         id="jchains_xstream",
-        category="java-deser",
+        category="serialize",
         sub_category="XStream Spring JNDI",
         name="XStream Spring JNDI (PartiallyComparable)",
         description="XStream反序列化 — Spring AOP触发JNDI lookup",
@@ -947,7 +947,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_xstream_jndi",
-        category="java-deser",
+        category="serialize",
         sub_category="XStream Spring JNDI",
         name="XStream Spring JNDI (别名)",
         description="jchains_xstream别名 — XStream Spring JNDI",
@@ -957,7 +957,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_xstream_exec",
-        category="java-deser",
+        category="serialize",
         sub_category="XStream JDK原生执行",
         name="XStream JDK native XSLT exec",
         description="XStream反序列化 — XsltOnlyJdk + JsConvert直接命令执行，无需Spring依赖",
@@ -969,7 +969,7 @@ CATALOG: list[ChainEntry] = [
     # -- Shiro --
     ChainEntry(
         id="jchains_shiro_cbc",
-        category="java-deser",
+        category="serialize",
         sub_category="Shiro AES-CBC",
         name="Shiro RememberMe CB1 AES-CBC (java-chains)",
         description="java-chains生成Shiro RememberMe cookie — CB1+TemplatesImpl字节码执行，AES-CBC模式",
@@ -981,7 +981,7 @@ CATALOG: list[ChainEntry] = [
     # -- JavaNative CC --
     ChainEntry(
         id="jchains_cc1",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-Collections K1",
         name="CC K1 (java-chains)",
         description="JavaNative反序列化 — CommonsCollectionsK1 + TemplatesImpl字节码执行",
@@ -991,7 +991,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_cc2",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-Collections K2",
         name="CC K2 (java-chains)",
         description="JavaNative反序列化 — CommonsCollectionsK2 + TemplatesImpl字节码执行",
@@ -1001,7 +1001,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_cc3",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-Collections K3",
         name="CC K3 (java-chains)",
         description="JavaNative反序列化 — CommonsCollectionsK3 + TransformerWithTemplatesImpl字节码执行",
@@ -1011,7 +1011,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_cc4",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-Collections K4",
         name="CC K4 (java-chains)",
         description="JavaNative反序列化 — CommonsCollectionsK4 + TransformerWithTemplatesImpl字节码执行",
@@ -1021,7 +1021,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_cc6",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-Collections K1 (CC6)",
         name="CC6/K1 (java-chains)",
         description="JavaNative反序列化 — CommonsCollectionsK1 JDK无版本限制变体",
@@ -1031,7 +1031,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_native_cc6",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-Collections K1 (native别名)",
         name="CC6/K1 native (java-chains别名)",
         description="jchains_cc6别名 — CommonsCollectionsK1 JDK无版本限制变体",
@@ -1043,7 +1043,7 @@ CATALOG: list[ChainEntry] = [
     # -- JavaNative CB --
     ChainEntry(
         id="jchains_cb1",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-BeanUtils CB1",
         name="CB1 (java-chains)",
         description="JavaNative反序列化 — CommonsBeanutils1 + TemplatesImpl，无CC依赖，适合Shiro环境",
@@ -1053,7 +1053,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_native_cb1",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-BeanUtils CB1 (native别名)",
         name="CB1 native (java-chains别名)",
         description="jchains_cb1别名 — CommonsBeanutils1 + TemplatesImpl",
@@ -1063,7 +1063,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_native_cb2",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-BeanUtils CB2",
         name="CB2 BeanUtils 1.8.x (java-chains)",
         description="JavaNative反序列化 — CommonsBeanutils2，针对BeanUtils 1.8.x版本的变体",
@@ -1073,7 +1073,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_native_cb1_jndi",
-        category="java-deser",
+        category="serialize",
         sub_category="Commons-BeanUtils CB1 JNDI",
         name="CB1 JNDI (java-chains)",
         description="JavaNative反序列化 — CommonsBeanutils1 + JdbcRowSetImpl触发JNDI lookup",
@@ -1085,7 +1085,7 @@ CATALOG: list[ChainEntry] = [
     # -- JavaNative Jackson --
     ChainEntry(
         id="jchains_native_jackson",
-        category="java-deser",
+        category="serialize",
         sub_category="Jackson 反序列化",
         name="Jackson TWrap TemplatesImpl (java-chains)",
         description="JavaNative反序列化 — Jackson + TWrap触发TemplatesImpl字节码加载执行命令",
@@ -1097,7 +1097,7 @@ CATALOG: list[ChainEntry] = [
     # -- JavaNative JDK17 --
     ChainEntry(
         id="jchains_native_jdk17_1",
-        category="java-deser",
+        category="serialize",
         sub_category="JDK17 高版本绕过 RCE1",
         name="JDK17 EventListenerList RCE (java-chains)",
         description="JavaNative反序列化 — JDK17高版本绕过，EventListenerListToStringHighJDK + JacksonToString + TemplatesImpl2字节码执行",
@@ -1107,7 +1107,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_native_jdk17_2",
-        category="java-deser",
+        category="serialize",
         sub_category="JDK17 高版本绕过 RCE2",
         name="JDK17 TextAndMnemonicHashMap RCE (java-chains)",
         description="JavaNative反序列化 — JDK17高版本绕过，TextAndMnemonicHashMapToStringHighJDK + JacksonToString + TemplatesImpl2字节码执行",
@@ -1119,7 +1119,7 @@ CATALOG: list[ChainEntry] = [
     # -- JavaNative C3P0 --
     ChainEntry(
         id="jchains_native_c3p0_ldap",
-        category="java-deser",
+        category="serialize",
         sub_category="C3P0 LDAP远程类加载",
         name="C3P0 LDAP ClassLoader (java-chains)",
         description="JavaNative反序列化 — MchangeC3p0Reference + LdapClassLoader，通过LDAP远程加载字节码",
@@ -1130,7 +1130,7 @@ CATALOG: list[ChainEntry] = [
     ),
     ChainEntry(
         id="jchains_native_c3p0_el",
-        category="java-deser",
+        category="serialize",
         sub_category="C3P0 Tomcat EL执行",
         name="C3P0 Tomcat EL exec (java-chains)",
         description="JavaNative反序列化 — MchangeC3p0Reference + TomcatElRef，通过Tomcat EL表达式执行命令",
@@ -1142,7 +1142,7 @@ CATALOG: list[ChainEntry] = [
     # -- JavaNative K1 secondary --
     ChainEntry(
         id="jchains_native_k1_secondary",
-        category="java-deser",
+        category="serialize",
         sub_category="CC K1 二次反序列化",
         name="CC K1 SignedObject 二次反序列化 (java-chains)",
         description="JavaNative反序列化 — CommonsCollectionsK1 + SignedObject包装二次反序列化，内层K3+TemplatesImpl执行命令，可绕过某些安全检测",
@@ -1196,7 +1196,7 @@ CATALOG: list[ChainEntry] = [
     # -- H2 JDBC --
     ChainEntry(
         id="jchains_h2_jdbc",
-        category="java-deser",
+        category="serialize",
         sub_category="H2 JDBC RCE",
         name="H2 JDBC URL 内嵌字节码 RCE (java-chains)",
         description="OtherPayload — 生成含内嵌字节码的H2 JDBC URL，通过H2 INIT执行Java代码，适用于JDBC URL可控的场景",
@@ -1208,7 +1208,7 @@ CATALOG: list[ChainEntry] = [
     # -- BlazeDS Axis2 --
     ChainEntry(
         id="jchains_blazeds_axis2",
-        category="java-deser",
+        category="serialize",
         sub_category="BlazeDS AMF3 Axis2",
         name="BlazeDS AMF3 Axis2 RCE (java-chains)",
         description="BlazeDSAMF3AMPayload — Axis2MetaDataEntry + CB1 + TemplatesImpl，利用Adobe BlazeDS AMF3反序列化漏洞执行命令",
