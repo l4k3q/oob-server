@@ -8,9 +8,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Base64;
@@ -51,8 +49,10 @@ public class ShiroVulnApp {
 
         @Override
         public void handle(HttpExchange ex) throws IOException {
-            // Read body (needed to consume POST form data, though we ignore it)
-            ex.getRequestBody().readAllBytes();
+            // Consume POST body (ignore content)
+            InputStream bodyStream = ex.getRequestBody();
+            byte[] buf = new byte[4096];
+            while (bodyStream.read(buf) != -1) { /* drain */ }
 
             String rememberMe = extractCookie(ex.getRequestHeaders().getFirst("Cookie"), "rememberMe");
 

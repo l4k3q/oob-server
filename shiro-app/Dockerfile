@@ -6,6 +6,7 @@ COPY src ./src
 RUN mvn -q package -DskipTests
 
 FROM openjdk:8-jre-slim
+RUN apt-get update -q && apt-get install -y --no-install-recommends curl wget && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/target/shiro-app-1.0.jar app.jar
 EXPOSE 8080

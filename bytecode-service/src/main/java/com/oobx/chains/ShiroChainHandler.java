@@ -39,12 +39,13 @@ public class ShiroChainHandler implements ChainHandler {
         byte[] key = Base64.getDecoder().decode(keyB64);
         byte[] encrypted = encryptShiro(serialized, key, mode);
 
-        // Step 3: Base64 encode the final cookie value
+        // Return raw encrypted bytes — toApiResponse() base64-encodes them to produce the cookie value.
+        // value = base64(encrypted) = the rememberMe cookie string ready to send.
         String cookieValue = Base64.getEncoder().encodeToString(encrypted);
 
         return new PayloadResult(
             "text/plain",
-            cookieValue.getBytes(),
+            encrypted,
             Map.of(
                 "cookie_header", "Cookie: rememberMe=" + cookieValue,
                 "inner_chain", innerChain,
