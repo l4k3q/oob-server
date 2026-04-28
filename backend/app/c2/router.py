@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Body, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,7 +52,7 @@ async def agent_register(
 @router.post("/agent/heartbeat")
 async def agent_heartbeat(
     ws_token: str,
-    result: dict[str, Any] | None = None,
+    result: dict[str, Any] | None = Body(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Polling heartbeat for agents that can't do WebSocket (e.g. old filters)."""
