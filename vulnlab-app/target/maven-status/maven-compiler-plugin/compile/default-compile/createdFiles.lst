@@ -1,0 +1,7 @@
+com\vulnlab\VulnLabServer$Log4ShellHandler.class
+com\vulnlab\VulnLabServer$XStreamHandler.class
+com\vulnlab\VulnLabServer.class
+com\vulnlab\VulnLabServer$HessianHandler.class
+com\vulnlab\VulnLabServer$DeserHandler.class
+com\vulnlab\VulnLabServer$FastjsonHandler.class
+com\vulnlab\VulnLabServer$HealthHandler.class

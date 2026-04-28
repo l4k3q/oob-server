@@ -2,6 +2,9 @@ com\oobx\chains\ShiroChainHandler.class
 com\oobx\chains\HessianChainHandler.class
 com\oobx\rebind\RebindStore.class
 com\oobx\chains\ChainRegistry.class
+com\oobx\chains\JavaChainsProxyHandler$ChainDef.class
+com\oobx\controller\CompileController.class
+com\oobx\chains\JavaChainsProxyHandler.class
 com\oobx\chains\ShiroHandler.class
 com\oobx\chains\C3P0ChainHandler.class
 com\oobx\chains\CustomBytecodeHandler.class
@@ -10,6 +13,7 @@ com\oobx\chains\FastjsonChainHandler.class
 com\oobx\memshells\MemshellFactory.class
 com\oobx\controller\PayloadController.class
 com\oobx\chains\YsoserialHandler.class
+com\oobx\chains\BytecodeSerializeHandler.class
 com\oobx\rebind\RebindStore$Entry.class
 com\oobx\controller\ClassController.class
 com\oobx\controller\RmiController.class

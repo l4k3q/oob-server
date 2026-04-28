@@ -31,5 +31,9 @@ exec java \
     --add-opens java.base/java.lang=ALL-UNNAMED \
     --add-opens java.base/java.lang.reflect=ALL-UNNAMED \
     --add-opens java.base/java.util=ALL-UNNAMED \
+    --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.trax=ALL-UNNAMED \
+    --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.runtime=ALL-UNNAMED \
+    --add-opens java.xml/com.sun.org.apache.xml.internal.dtm=ALL-UNNAMED \
+    --add-opens java.xml/com.sun.org.apache.xml.internal.serializer=ALL-UNNAMED \
     -jar /app/bytecode-service-0.1.0.jar \
     "$@"

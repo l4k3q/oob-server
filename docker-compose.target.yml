@@ -1,11 +1,12 @@
 version: "3.9"
 
-# ── Vulnerable Java target lab ──────────────────────────────────────────────────
-# Deploy on the target machine. All services are intentionally vulnerable.
-# Set OOB_HOST to the IP of your OOBserver (CT1) so payloads call back correctly.
+# ── Vulnerable Java target lab (CT2) ────────────────────────────────────────────
+# CT1 = OOBserver (docker-compose.yml), CT2 = these targets
+# OOBserver is reachable from all containers via host.docker.internal (192.168.65.254):
+#   HTTP/API : 8010   LDAP : 1389   RMI  : 1099   TCP : 9999
 #
-# Usage:
-#   OOB_HOST=10.0.7.25 docker compose -f docker-compose.target.yml up -d
+# Usage (local, OOBserver already on host):
+#   docker compose -f docker-compose.target.yml up -d
 
 networks:
   vulnlab:
@@ -13,7 +14,24 @@ networks:
 
 services:
 
-  # ── Log4Shell (CVE-2021-44228) ────────────────────────────────────────────
+  # ── Custom vulnlab (self-built, all-in-one deser/hessian/fastjson/xstream/log4shell) ──
+  vulnlab:
+    build:
+      context: ./vulnlab-app
+      dockerfile: Dockerfile
+    container_name: vuln-vulnlab
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    networks:
+      - vulnlab
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      vuln: "All-in-one: deser/hessian1/hessian2/fastjson/xstream/log4shell"
+      endpoints: "/deser /hessian /hessian2 /fastjson /xstream /log4shell"
+
+  # ── Log4Shell (CVE-2021-44228) — Tomcat + Spring Boot + Log4j2 2.14.1 ────
   log4shell:
     image: ghcr.io/christophetd/log4shell-vulnerable-app:latest
     container_name: vuln-log4shell
@@ -22,6 +40,8 @@ services:
       - "8081:8080"
     networks:
       - vulnlab
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     labels:
       vuln: "Log4Shell CVE-2021-44228"
       payload: "log4shell_basic"

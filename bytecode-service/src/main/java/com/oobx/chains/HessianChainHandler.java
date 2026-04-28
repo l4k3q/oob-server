@@ -117,10 +117,9 @@ public class HessianChainHandler implements ChainHandler {
             return new byte[0];
         }
 
-        // marshalsec.Hessian <gadget> <output-file> <url>
-        // Use marshalsec.Hessian for Hessian2, marshalsec.Hessian1 for Hessian1
-        // (marshalsec version >= 0.0.3 supports both)
-        String mainClass = hessian2 ? "marshalsec.Hessian" : "marshalsec.Hessian1";
+        // marshalsec only has marshalsec.Hessian (Hessian2 format).
+        // Hessian1 format must be generated via java-chains (jchains_hessian1_* chains).
+        String mainClass = "marshalsec.Hessian";
 
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);

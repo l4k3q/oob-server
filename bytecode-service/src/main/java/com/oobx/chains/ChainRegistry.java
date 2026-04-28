@@ -23,7 +23,8 @@ public class ChainRegistry {
             C3P0ChainHandler c3p0,
             XStreamChainHandler xstream,
             FastjsonChainHandler fastjson,
-            JavaChainsProxyHandler javaChains) {
+            JavaChainsProxyHandler javaChains,
+            BytecodeSerializeHandler bytecodeSerialize) {
 
         // ── ysoserial catalog short IDs ──────────────────────────────────────
         Map<String, String> catalogIds = Map.ofEntries(
@@ -92,6 +93,9 @@ public class ChainRegistry {
         // ── jchains_* → JavaChainsProxyHandler (backed by java-chains service) ─
         // Requires java-chains running at javachains.url (default :8011) with CHAINS_AUTH=false
         javaChains.chainIds().forEach(id -> handlers.put(id, javaChains));
+
+        // ── CC6+TemplatesImpl bytecode wrap (no subprocess, pure in-process) ─
+        handlers.put("serialize_bytecode_cc6", bytecodeSerialize);
     }
 
     public ChainHandler get(String chainId) {
