@@ -165,8 +165,14 @@ class LdapProtocol(asyncio.Protocol):
             # baseObject is first octet-string in op_payload
             _, base_dn, _ = _parse_tlv(op_payload, 0)
             dn = base_dn.decode(errors="replace")
-            token = dn.lstrip("/").split(",")[0]
-            token = token.split("=")[-1] if "=" in token else token
+            raw = dn.lstrip("/")
+            # Path-style DN: /TOKEN/ClassName → take first path segment
+            if "/" in raw:
+                token = raw.split("/")[0]
+            else:
+                # LDAP-style DN: cn=TOKEN,dc=... → take first attribute value
+                first_part = raw.split(",")[0]
+                token = first_part.split("=")[-1] if "=" in first_part else first_part
             asyncio.get_running_loop().create_task(self._respond_search(msg_id, dn, token))
             return
         # unknown op: reply done

