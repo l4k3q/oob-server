@@ -18,6 +18,7 @@ from .events_router import router as events_router
 from .listeners.http_collector import router as cb_router
 from .listeners.manager import start_all, stop_all
 from .compile_router import router as compile_router
+from .jrmp_router import router as jrmp_router
 from .memshells.router import router as memshell_router
 from .payloads.router import router as payload_router
 from .projects.router import router as project_router
@@ -123,6 +124,7 @@ def create_app() -> FastAPI:
     app.include_router(token_router)
     app.include_router(payload_router)
     app.include_router(compile_router)
+    app.include_router(jrmp_router)
     app.include_router(memshell_router)
     app.include_router(rebind_router)
     app.include_router(c2_router)

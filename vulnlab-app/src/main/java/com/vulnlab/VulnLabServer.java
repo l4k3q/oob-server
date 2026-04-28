@@ -33,6 +33,7 @@ public class VulnLabServer {
         server.createContext("/hessian",  new HessianHandler(false));
         server.createContext("/hessian2", new HessianHandler(true));
         server.createContext("/log4shell", new Log4ShellHandler());
+        server.createContext("/h2jdbc",   new H2JdbcHandler());
         server.createContext("/health",   new HealthHandler());
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
@@ -43,6 +44,7 @@ public class VulnLabServer {
         System.out.println("  /hessian    Hessian deserialization");
         System.out.println("  /hessian2   Hessian2 deserialization");
         System.out.println("  /log4shell  Log4j2 CVE-2021-44228 via User-Agent");
+        System.out.println("  /h2jdbc     H2 JDBC RUNSCRIPT RCE (jchains_h2_jdbc)");
         System.out.println("  /health     health check");
     }
 
@@ -180,9 +182,36 @@ public class VulnLabServer {
         }
     }
 
+    static class H2JdbcHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            byte[] body = readBody(ex);
+            String jdbcUrl = new String(body, "UTF-8").trim();
+            // Accept JSON: {"url":"jdbc:h2:..."} or raw URL
+            if (jdbcUrl.startsWith("{")) {
+                try {
+                    com.alibaba.fastjson.JSONObject obj = com.alibaba.fastjson.JSON.parseObject(jdbcUrl);
+                    jdbcUrl = obj.getString("url");
+                } catch (Throwable ignored) {}
+            }
+            System.out.println("[h2jdbc] Connecting to: " + jdbcUrl);
+            final String url = jdbcUrl;
+            // Connect in background — H2 INIT scripts may block
+            new Thread(() -> {
+                try {
+                    Class.forName("org.h2.Driver");
+                    java.sql.Connection c = java.sql.DriverManager.getConnection(url, "sa", "");
+                    c.close();
+                } catch (Throwable t) {
+                    System.out.println("[h2jdbc] Exception: " + t.getMessage());
+                }
+            }, "h2jdbc-trigger").start();
+            respond(ex, 200, "OK");
+        }
+    }
+
     static class HealthHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
-            respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\"]}");
+            respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\",\"/h2jdbc\"]}");
         }
     }
 }

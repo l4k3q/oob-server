@@ -38,6 +38,7 @@ services:
     restart: unless-stopped
     ports:
       - "8711:8711"
+      - "10099:10099"   # ysoserial JRMPListener (for jrmp_client chain test)
     environment:
       YSOSERIAL_JAVA: /usr/lib/jvm/java-8-openjdk-amd64/bin/java
       JAVACHAINS_URL: http://127.0.0.1:8011
