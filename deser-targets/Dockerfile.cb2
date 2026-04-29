@@ -1,5 +1,6 @@
-FROM maven:3.8-openjdk-8 AS build
+FROM maven:3.6.3-openjdk-8 AS build
 WORKDIR /app
+COPY settings.xml /root/.m2/settings.xml
 COPY pom-cb2.xml pom.xml
 RUN mvn -q dependency:go-offline
 COPY DeserApp.java .

@@ -16,13 +16,13 @@
     <dependency><groupId>commons-collections</groupId><artifactId>commons-collections</artifactId><version>3.2.1</version></dependency>
     <dependency><groupId>commons-beanutils</groupId><artifactId>commons-beanutils</artifactId><version>1.9.4</version></dependency>
     <dependency><groupId>rome</groupId><artifactId>rome</artifactId><version>1.0</version></dependency>
-    <!-- Spring 4.1.3 — matches ysoserial Spring1/Spring2 which use SerializableTypeWrapper (Spring 4+ only) -->
-    <dependency><groupId>org.springframework</groupId><artifactId>spring-core</artifactId><version>4.1.3.RELEASE</version></dependency>
-    <dependency><groupId>org.springframework</groupId><artifactId>spring-beans</artifactId><version>4.1.3.RELEASE</version></dependency>
-    <dependency><groupId>org.springframework</groupId><artifactId>spring-aop</artifactId><version>4.1.3.RELEASE</version></dependency>
-    <dependency><groupId>org.springframework</groupId><artifactId>spring-context</artifactId><version>4.1.3.RELEASE</version></dependency>
+    <!-- Spring 4.3.30 — confirms presence of SerializableTypeWrapper$MethodInvokeTypeProvider for ysoserial Spring1/Spring2 -->
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-core</artifactId><version>4.3.30.RELEASE</version></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-beans</artifactId><version>4.3.30.RELEASE</version></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-aop</artifactId><version>4.3.30.RELEASE</version></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-context</artifactId><version>4.3.30.RELEASE</version></dependency>
     <dependency><groupId>aopalliance</groupId><artifactId>aopalliance</artifactId><version>1.0</version></dependency>
-    <dependency><groupId>org.aspectj</groupId><artifactId>aspectjweaver</artifactId><version>1.8.6</version></dependency>
+    <dependency><groupId>org.aspectj</groupId><artifactId>aspectjweaver</artifactId><version>1.9.7</version></dependency>
     <!-- Hessian — for /hessian + /hessian2 endpoints (spring_exec chains) -->
     <dependency><groupId>com.caucho</groupId><artifactId>hessian</artifactId><version>4.0.66</version></dependency>
   </dependencies>

