@@ -238,12 +238,13 @@ KNOWN_SKIP = {
     "ysoserial_spring1": "AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51",
     "ysoserial_spring2": "AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51",
 
-    # java7 container uses Zulu 7u352, which is AFTER the AIH patch (JDK 7u51) and after
-    # the Jdk7u21 fix (JDK 7u25). CC1/CC3 use AnnotationInvocationHandler gadget which was
-    # patched in 7u51; Jdk7u21 chain was patched in 7u25. All three require JDK < 7u25 / 7u51.
-    "ysoserial_cc1":    "AnnotationInvocationHandler gadget patched in JDK 7u51; java7 container uses Zulu 7u352 (post-patch)",
-    "ysoserial_cc3":    "AnnotationInvocationHandler gadget patched in JDK 7u51; java7 container uses Zulu 7u352 (post-patch)",
-    "ysoserial_jdk7u21": "Jdk7u21 AnnotationInvocationHandler chain patched in JDK 7u25; java7 container uses Zulu 7u352 (post-patch)",
+    # ysoserial_cc1 and ysoserial_cc3 are handled via java8-old with -Xbootclasspath/p patch
+    # (see Dockerfile.java8old) — NOT in KNOWN_SKIP; routed to :8891 in Section 1b.
+
+    # ysoserial_jdk7u21 requires JDK < 7u21 (patched in 7u21 itself). No pre-7u21 JDK image
+    # available (Docker Hub v1-manifest images rejected by containerd v2.1; no reliable source
+    # for old JDK 7 Linux tarballs). All available JDK 7 images (Zulu 7u352) are post-patch.
+    "ysoserial_jdk7u21": "Jdk7u21 chain requires JDK < 7u21; all available JDK7 images (Zulu 7u352) are post-patch; no pre-7u21 image available",
 
     # jchains_native_c3p0_el / jchains_native_c3p0_ldap:
     # - c3p0_el uses Tomcat BeanFactory forceString feature which was removed as a security
@@ -1103,14 +1104,17 @@ def main():
                 "ysoserial_hibernate1"]:
         test_deser_chain(cid)
 
-    print("\n[*] Section 1b: ysoserial cc1/cc3 → java7 :8892 (AIH fix in JDK 8u71+; java7 is pre-patch)")
-    # cc1/cc3: AnnotationInvocationHandler gadget patched in JDK 8u71+; java8-old=8u102 is AFTER patch.
-    # java7 (Zulu JDK 7) is still vulnerable. Both targets have CC3 on classpath.
+    print("\n[*] Section 1b: ysoserial cc1/cc3 → java8-old :8891 (pre-8u71 AIH via -Xbootclasspath/p patch)")
+    # cc1/cc3: AnnotationInvocationHandler gadget patched in JDK 8u71+.
+    # java8-old (8u102) runs with a pre-8u71 AIH class injected via -Xbootclasspath/p,
+    # overriding rt.jar so CC1/CC3 payloads deserialise correctly without IncompleteAnnotationException.
+    # java7 (Zulu 7u352) is also post-7u51-patch and does NOT work for CC1/CC3.
+    # Both targets have CC3 on classpath.
     for cid in ["ysoserial_cc1","ysoserial_cc3"]:
-        if j7_ok:
-            test_deser_chain(cid, target_url=JAVA7_URL, container_name="vuln-java7")
+        if j8old_ok:
+            test_deser_chain(cid, target_url=JAVA8OLD_URL, container_name="vuln-java8old")
         else:
-            record(cid, "SKIP", "java7 target not running (needed for CC1/CC3 pre-AIH-patch)")
+            record(cid, "SKIP", "java8-old target not running (needed for CC1/CC3 pre-AIH-patch)")
     # groovy1: MethodClosure SUID differs JDK8 vs JDK17; needs groovy on classpath. Test on vulnlab.
     # Note: will fail on JDK17 vulnlab due to SUID mismatch. Acceptable SKIP until groovy dep resolved.
     test_deser_chain("ysoserial_groovy1")

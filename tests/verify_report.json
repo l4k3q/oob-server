@@ -1,40 +1,40 @@
 {
-  "timestamp": "2026-04-29T22:22:08.213667",
+  "timestamp": "2026-04-29T23:52:35.627457",
   "results": [
     {
       "chain": "ysoserial_cc5",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_6ecbc7eb21b5 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_8e31eba0e28a \u2713"
     },
     {
       "chain": "ysoserial_cc6",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_6b6d969374b3 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_8cb19e9cd715 \u2713"
     },
     {
       "chain": "ysoserial_cc7",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_ff42ae646e76 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_378ca5a4c62e \u2713"
     },
     {
       "chain": "ysoserial_cb1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_63f9e2238dc0 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_7fbfe9bbd2f7 \u2713"
     },
     {
       "chain": "cb_no_cc",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_b87044dc9bd3 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_be74af3994da \u2713"
     },
     {
       "chain": "ysoserial_rome",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_ea242241b18f \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_03618f1a9ff0 \u2713"
     },
     {
       "chain": "ysoserial_hibernate1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_145878afcd77 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_521c48c6e082 \u2713"
     },
     {
       "chain": "ysoserial_cc1",
@@ -49,17 +49,17 @@
     {
       "chain": "ysoserial_groovy1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_b8f97e1407f7 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_214cc9e88f0b \u2713"
     },
     {
       "chain": "ysoserial_jdk7u21",
-      "status": "FAIL",
-      "note": "no OOB callback + no RCE file (deser resp=200: OK)"
+      "status": "SKIP",
+      "note": "Jdk7u21 chain requires JDK < 7u21; all available JDK7 images (Zulu 7u352) are post-patch; no pre-7u21 image available"
     },
     {
       "chain": "ysoserial_cc6",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_37fb5260971d \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_1c430170d55c \u2713"
     },
     {
       "chain": "ysoserial_spring1",
@@ -79,132 +79,132 @@
     {
       "chain": "ysoserial_jrmp_client",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_2aad547845db \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_0bcb35d9dffa \u2713"
     },
     {
       "chain": "jchains_native_cc6",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_1afa75459aa3 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_06c691e10982 \u2713"
     },
     {
       "chain": "jchains_native_cb1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_0ff0a6b83600 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_597947d6d7e0 \u2713"
     },
     {
       "chain": "jchains_native_k1_secondary",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_5ecb6b223631 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_509c18549d4b \u2713"
     },
     {
       "chain": "jchains_cc1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_964b1990eddb \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_b24178d836bd \u2713"
     },
     {
       "chain": "jchains_cc3",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_51cfbf81aea4 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_69bc926dd776 \u2713"
     },
     {
       "chain": "jchains_cc6",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_99cef06e0e31 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_64d0da2b6d1f \u2713"
     },
     {
       "chain": "jchains_native_jackson",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_325b16cbeb02 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_4563887a8656 \u2713"
     },
     {
       "chain": "jchains_native_c3p0_el",
-      "status": "FAIL",
-      "note": "no OOB callback + no RCE file (deser resp=200: EX: Failed to acquire the Context necessary to lookup an Obj)"
+      "status": "SKIP",
+      "note": "Tomcat BeanFactory forceString removed in 9.0.x security hardening (tomcat-embed-core 9.0.65)"
     },
     {
       "chain": "jchains_native_cb1_jndi",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:53048 proto=ldap"
+      "note": "callback from 172.20.0.1:40704 proto=ldap"
     },
     {
       "chain": "jchains_native_c3p0_ldap",
-      "status": "FAIL",
-      "note": "no OOB callback (deser resp=200: EX: Failed to acquire the Context necessary to lookup an Obj)"
+      "status": "SKIP",
+      "note": "LdapClassLoader requires ldap:// URL handler not present in standard JDK"
     },
     {
       "chain": "ysoserial_cc2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_f1518979cdb1 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_97d3a00d9a4a \u2713"
     },
     {
       "chain": "ysoserial_cc4",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_cb4d08ad2f8d \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_c66f011884a1 \u2713"
     },
     {
       "chain": "jchains_cc2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_10ec631a2a06 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_73177e11e2b4 \u2713"
     },
     {
       "chain": "jchains_cc4",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_9f82cc54cbdb \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_72dc3a0c111c \u2713"
     },
     {
       "chain": "jchains_native_jdk17_1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_fabb010636fa \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_2444f9dc1e05 \u2713"
     },
     {
       "chain": "jchains_native_jdk17_2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_9ee034537c54 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_0c47086b839b \u2713"
     },
     {
       "chain": "jchains_native_cb2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_2e5a813e957c \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_5b27c2f38c8f \u2713"
     },
     {
       "chain": "hessian1_spring",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:43988"
+      "note": "callback from 172.20.0.1:40796"
     },
     {
       "chain": "jchains_hessian1_spring",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:44064"
+      "note": "callback from 172.20.0.1:40802"
     },
     {
       "chain": "jchains_hessian1_spring2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:44076"
+      "note": "callback from 172.20.0.1:40804"
     },
     {
       "chain": "jchains_hessian1_exec",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_5ae4a65b3359 \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_3172b3d024b6 \u2713"
     },
     {
       "chain": "jchains_hessian1_rome1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_054d0f55da2d \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_44a0fd5d79e4 \u2713"
     },
     {
       "chain": "jchains_hessian1_rome2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_a7e5571fcb4a \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_93c89f7088d6 \u2713"
     },
     {
       "chain": "jchains_hessian1_secondary",
-      "status": "FAIL",
-      "note": "no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=sun.swing.SwingLazyValue@29624309}={aaa=sun)"
+      "status": "PASS",
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_7d95a68accc2 \u2713"
     },
     {
       "chain": "jchains_hessian1_bcel",
       "status": "FAIL",
-      "note": "no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@52cb7)"
+      "note": "no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@1f671)"
     },
     {
       "chain": "jchains_hessian1_spring_exec",
@@ -219,47 +219,47 @@
     {
       "chain": "hessian2_spring",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:38806"
+      "note": "callback from 172.20.0.1:49320"
     },
     {
       "chain": "jchains_hessian2_spring",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:38924"
+      "note": "callback from 172.20.0.1:49346"
     },
     {
       "chain": "jchains_hessian2_spring2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:38972"
+      "note": "callback from 172.20.0.1:49370"
     },
     {
       "chain": "jchains_hessian2_exec",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_bfeba818ca9c \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_4ef566ab3ec9 \u2713"
     },
     {
       "chain": "jchains_hessian2_rome1",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_8815c1dc0d9b \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_2b0a4be20a3f \u2713"
     },
     {
       "chain": "jchains_hessian2_rome2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_0008c436587a \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_318de3681d4d \u2713"
     },
     {
       "chain": "jchains_hessian2_secondary",
-      "status": "FAIL",
-      "note": "no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=sun.swing.SwingLazyValue@239a12e4}={aaa=sun)"
+      "status": "PASS",
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_8f0af1f94572 \u2713"
     },
     {
       "chain": "jchains_hessian2_bcel",
       "status": "FAIL",
-      "note": "no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@5a4c3)"
+      "note": "no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@64448)"
     },
     {
       "chain": "jchains_hessian2_tostring_jackson",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_e07bb12958de \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_4155330cd158 \u2713"
     },
     {
       "chain": "jchains_hessian2_tostring_xbean",
@@ -269,37 +269,37 @@
     {
       "chain": "fastjson_jdbcrowset",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:42554"
+      "note": "callback from 172.20.0.1:33464"
     },
     {
       "chain": "fastjson_jdbcrowset_v2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:42574"
+      "note": "callback from 172.20.0.1:33478"
     },
     {
       "chain": "fastjson_bcel",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_87e493abf8c2 \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_1f6d3d7cee00 \u2713"
     },
     {
       "chain": "jchains_fastjson",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:42586"
+      "note": "callback from 172.20.0.1:57124"
     },
     {
       "chain": "jchains_fastjson_bcel",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_da41d4780d58 \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_e6a1a656f836 \u2713"
     },
     {
       "chain": "jchains_fastjson_jndi",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:42600"
+      "note": "callback from 172.20.0.1:57134"
     },
     {
       "chain": "jchains_fastjson_c3p0_h2",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_3f2b6257c89d \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_e2df238fbce8 \u2713"
     },
     {
       "chain": "xstream_eventhandler",
@@ -309,7 +309,7 @@
     {
       "chain": "jchains_xstream",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:42622"
+      "note": "callback from 172.20.0.1:57144"
     },
     {
       "chain": "jchains_xstream_exec",
@@ -319,7 +319,7 @@
     {
       "chain": "jchains_xstream_jndi",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:42638"
+      "note": "callback from 172.20.0.1:57156"
     },
     {
       "chain": "log4shell_vulnlab",
@@ -329,32 +329,32 @@
     {
       "chain": "log4shell_dedicated",
       "status": "PASS",
-      "note": "LDAP callback from 172.20.0.1:42654"
+      "note": "LDAP callback from 172.20.0.1:57182"
     },
     {
       "chain": "shiro_cbc",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_302e6974b841 \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_b874651a5f03 \u2713"
     },
     {
       "chain": "shiro_gcm",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_af6c4c7a58ef \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_237cb80e72b8 \u2713"
     },
     {
       "chain": "jchains_shiro_cbc",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_95d425a23354 \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_6318609588c3 \u2713"
     },
     {
       "chain": "c3p0_jndi",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_fcc5c1c3f5c2 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_106d4897ad6d \u2713"
     },
     {
       "chain": "c3p0_wrapperds",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_3bacbbe45316 \u2713"
+      "note": "callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_4349291c200b \u2713"
     },
     {
       "chain": "jchains_blazeds_axis2",
@@ -369,22 +369,22 @@
     {
       "chain": "jchains_jndi_tomcat_el",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:50196"
+      "note": "callback from 172.20.0.1:42466"
     },
     {
       "chain": "jchains_jndi_groovy",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:50226"
+      "note": "callback from 172.20.0.1:42480"
     },
     {
       "chain": "jchains_jndi_beanshell",
       "status": "PASS",
-      "note": "callback from 172.20.0.1:50254"
+      "note": "callback from 172.20.0.1:42490"
     },
     {
       "chain": "jchains_jndi_snakeyaml",
       "status": "PASS",
-      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_5c19417301fe \u2713"
+      "note": "callback from 172.20.0.1 + RCE file /tmp/oobx_2dff8cc2150b \u2713"
     },
     {
       "chain": "ms_tomcat_filter_cmd",
@@ -404,7 +404,7 @@
     {
       "chain": "ms_tomcat_filter_c2",
       "status": "PASS",
-      "note": "bytecode=3939b class=oobx.C2Hdlf4a96c99"
+      "note": "bytecode=3939b class=oobx.C2Hdl4016a8f7"
     },
     {
       "chain": "ms_tomcat_valve_cmd",
@@ -459,7 +459,7 @@
     {
       "chain": "c2_memshell_serialize",
       "status": "PASS",
-      "note": "agent registered from vulnlab deser: 0bb2656fcedfbfd7"
+      "note": "agent registered from vulnlab deser: f355ca935a1df9fa"
     },
     {
       "chain": "c2_memshell_jndi",
@@ -469,9 +469,9 @@
   ],
   "summary": {
     "total": 93,
-    "pass": 77,
-    "fail": 12,
-    "skip": 4,
+    "pass": 79,
+    "fail": 7,
+    "skip": 7,
     "err": 0
   }
 }
