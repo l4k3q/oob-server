@@ -220,11 +220,15 @@ services:
         --add-opens=java.xml/com.sun.org.apache.xalan.internal.xsltc.runtime=ALL-UNNAMED
         --add-opens=java.xml/com.sun.org.apache.xml.internal.dtm=ALL-UNNAMED
         --add-opens=java.xml/com.sun.org.apache.xml.internal.utils=ALL-UNNAMED
+        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+        --add-opens=java.base/java.lang=ALL-UNNAMED
     labels:
       vuln: "Java 17 deser — jdk17 high-version gadget chains"
       payload: "jchains_native_jdk17_1 jchains_native_jdk17_2"
 
-  # ── Spring 3.x target (ysoserial Spring1/Spring2 gadget chains) ──────────
+  # ── Spring 3.x target (Hessian SpringExec chains + reference for Spring1/2) ──────────
+  # Note: ysoserial_spring1/spring2 require JDK < 7u51 (CVE-2014-0428 fix strips AIH map)
+  # and are KNOWN_SKIP in verify_chains.py. This target serves jchains Hessian spring_exec.
   spring3:
     build:
       context: ./deser-targets
@@ -238,8 +242,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     labels:
-      vuln: "Spring 4.1.3 deser — spring1/spring2 + spring_exec Hessian chains"
-      payload: "ysoserial_spring1 ysoserial_spring2 jchains_hessian1_spring_exec jchains_hessian2_spring_exec"
+      vuln: "Spring 4.1.3 deser (JDK 8u202) — Hessian spring_exec chains"
+      payload: "jchains_hessian1_spring_exec jchains_hessian2_spring_exec"
+      note: "ysoserial_spring1/2 SKIP — require JDK<7u51 (CVE-2014-0428)"
 
   # ── BeanUtils 1.8.x target (CB2 gadget chain) ────────────────────────────
   cb2:

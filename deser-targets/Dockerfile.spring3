@@ -1,3 +1,5 @@
+FROM busybox:1.36.1-uclibc AS busybox
+
 FROM maven:3.6.3-openjdk-8 AS build
 WORKDIR /app
 COPY settings.xml /root/.m2/settings.xml
@@ -6,8 +8,15 @@ RUN mvn -q dependency:go-offline
 COPY DeserApp.java .
 RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
 
-FROM eclipse-temurin:8-jre-jammy
-RUN apt-get update -q && apt-get install -y --no-install-recommends curl wget ca-certificates && rm -rf /var/lib/apt/lists/*
+# JDK 8u202 — AnnotationInvocationHandler.invoke() still delegates to map for arbitrary
+# method names, which is required for ysoserial Spring1/Spring2 gadget chains.
+# 8u232+ changed the behavior to throw IncompleteAnnotationException before delegating.
+FROM azul/zulu-openjdk:8u202
+COPY --from=busybox /bin/busybox /usr/local/bin/busybox
+RUN chmod +x /usr/local/bin/busybox && \
+    ln -sf /usr/local/bin/busybox /usr/local/bin/wget && \
+    printf '#!/bin/sh\nOUT=/dev/null; URL=""; NOUT=0\nfor a in "$@"; do\n  if [ "$NOUT" = "1" ]; then OUT="$a"; NOUT=0\n  elif [ "$a" = "-o" ]; then NOUT=1\n  elif [ "${a#-}" = "$a" ]; then URL="$a"\n  fi\ndone\nexec /usr/local/bin/busybox wget -q -O "$OUT" "$URL"\n' \
+    > /usr/local/bin/curl && chmod +x /usr/local/bin/curl
 WORKDIR /app
 COPY --from=build /app/target/deser-app-spring3-1.0.jar app.jar
 EXPOSE 8888

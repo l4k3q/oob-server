@@ -229,6 +229,14 @@ KNOWN_SKIP = {
 
     # DNS-only — no OOB DNS resolver configured
     "ysoserial_urldns": "DNS-only chain; no OOB DNS resolver configured",
+
+    # ysoserial Spring1/Spring2: rely on AnnotationInvocationHandler.readObject() NOT validating
+    # map keys against annotation type elements. This was patched in CVE-2014-0428 (JDK 8u5 /
+    # 7u51 / 6u71). All JDK versions in current lab (7u352, 8u102+, 17.x) have the fix applied:
+    # readObject() strips map entries whose key isn't a valid annotation element, so the
+    # "getType" entry is removed and the chain fails with IncompleteAnnotationException.
+    "ysoserial_spring1": "AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51",
+    "ysoserial_spring2": "AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51",
 }
 
 
