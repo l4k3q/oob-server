@@ -118,17 +118,9 @@ public class VulnLabServer {
                     if (bds.getDriverClassName() != null && bds.getDriverClassName().startsWith("$$BCEL$$")) {
                         try {
                             Class<?> bcelCL = Class.forName("org.apache.bcel.util.ClassLoader");
-                            // Use getDeclaredConstructors() to find accessible constructor via reflection
-                            java.lang.reflect.Constructor<?> c = bcelCL.getDeclaredConstructors()[0];
-                            c.setAccessible(true);
-                            Object loader;
-                            if (c.getParameterCount() == 0) {
-                                loader = c.newInstance();
-                            } else {
-                                // Pass parent classloader if constructor requires one
-                                loader = c.newInstance(Thread.currentThread().getContextClassLoader());
-                            }
-                            bds.setDriverClassLoader((ClassLoader) loader);
+                            // Use getConstructor() to explicitly get the public no-arg constructor
+                            ClassLoader loader = (ClassLoader) bcelCL.getConstructor().newInstance();
+                            bds.setDriverClassLoader(loader);
                             System.out.println("[fastjson] BCEL classloader injected: " + loader.getClass().getName());
                         } catch (Throwable t) {
                             System.out.println("[fastjson] BCEL inject failed: " + t + " cause=" + t.getCause());
