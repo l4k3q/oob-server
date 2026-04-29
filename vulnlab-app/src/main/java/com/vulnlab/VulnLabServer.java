@@ -38,6 +38,7 @@ public class VulnLabServer {
         server.createContext("/hessian2", new HessianHandler(true));
         server.createContext("/log4shell", new Log4ShellHandler());
         server.createContext("/h2jdbc",   new H2JdbcHandler());
+        server.createContext("/snakeyaml", new SnakeYAMLHandler());
         server.createContext("/check-rce", new CheckRceHandler());
         server.createContext("/health",   new HealthHandler());
         server.setExecutor(Executors.newCachedThreadPool());
@@ -318,6 +319,20 @@ public class VulnLabServer {
     static class HealthHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
             respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\",\"/h2jdbc\",\"/check-rce\"]}");
+        }
+    }
+    static class SnakeYAMLHandler implements com.sun.net.httpserver.HttpHandler {
+        public void handle(com.sun.net.httpserver.HttpExchange ex) throws java.io.IOException {
+            byte[] body = readBody(ex);
+            String yaml = new String(body, "UTF-8");
+            System.out.println("[snakeyaml] Received: " + yaml.substring(0, Math.min(yaml.length(), 200)));
+            try {
+                Object obj = new org.yaml.snakeyaml.Yaml().load(yaml);
+                respond(ex, 200, "OK: " + (obj == null ? "null" : obj.getClass().getName()));
+            } catch (Throwable t) {
+                System.out.println("[snakeyaml] Exception: " + t.getMessage());
+                respond(ex, 200, "EX: " + t.getMessage());
+            }
         }
     }
 }

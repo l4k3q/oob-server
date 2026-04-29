@@ -16,7 +16,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Maven build ──────────────────────────────────────────────────────
-FROM maven:3.8-openjdk-8 AS build
+FROM maven:3.6.3-openjdk-8 AS build
 WORKDIR /app
 
 COPY pom-blazeds.xml pom.xml
@@ -28,7 +28,7 @@ RUN mkdir -p src/main/java/com/vulnlab/blazeds \
     && mvn -q package -DskipTests
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM openjdk:8-jre-slim
+FROM eclipse-temurin:8-jre-jammy
 
 RUN apt-get update -q \
     && apt-get install -y --no-install-recommends curl \
