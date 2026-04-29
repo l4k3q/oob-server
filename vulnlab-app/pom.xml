@@ -110,11 +110,18 @@
       <version>1.9.7</version>
     </dependency>
 
-    <!-- Commons Collections 4.x — required for CC2/CC4 gadget chains -->
+    <!-- Commons Collections 4.x — required for CC2/CC4 gadget chains (must be ≤4.0; 4.1+ removed Serializable) -->
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-collections4</artifactId>
-      <version>4.4</version>
+      <version>4.0</version>
+    </dependency>
+
+    <!-- Commons DBCP 1.4 — required for fastjson_bcel BasicDataSource chain -->
+    <dependency>
+      <groupId>commons-dbcp</groupId>
+      <artifactId>commons-dbcp</artifactId>
+      <version>1.4</version>
     </dependency>
 
     <!-- Jackson Databind — required for Jackson gadget chains -->
@@ -131,11 +138,11 @@
       <version>1.4.197</version>
     </dependency>
 
-    <!-- Groovy — required for ysoserial Groovy1 gadget chain -->
+    <!-- Groovy — required for ysoserial Groovy1 gadget chain (must match ysoserial's bundled 2.3.9) -->
     <dependency>
       <groupId>org.codehaus.groovy</groupId>
       <artifactId>groovy-all</artifactId>
-      <version>2.4.21</version>
+      <version>2.3.9</version>
     </dependency>
 
     <!-- Hibernate — required for ysoserial Hibernate1 gadget chain -->

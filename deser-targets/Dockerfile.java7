@@ -6,7 +6,15 @@ COPY DeserApp.java .
 RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
 
 FROM azul/zulu-openjdk:7
-RUN apt-get update -q && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# azul:7 may have stale apt repos — try multiple archives
+RUN (apt-get update -q 2>/dev/null && apt-get install -y --no-install-recommends curl ca-certificates) \
+    || (echo "deb http://old-releases.ubuntu.com/ubuntu trusty main restricted universe multiverse" > /etc/apt/sources.list \
+        && apt-get update -q 2>/dev/null \
+        && apt-get install -y --no-install-recommends curl ca-certificates) \
+    || (echo "deb [check-valid-until=no] http://archive.debian.org/debian wheezy main" > /etc/apt/sources.list \
+        && apt-get -o Acquire::Check-Valid-Until=false update -q \
+        && apt-get install -y --no-install-recommends curl ca-certificates) \
+    && rm -rf /var/lib/apt/lists/* || true
 WORKDIR /app
 COPY --from=build /app/target/deser-app-cc3-1.0.jar app.jar
 EXPOSE 8888

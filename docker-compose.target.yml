@@ -213,6 +213,13 @@ services:
       - vulnlab
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      # Open XSLT/XML internals for TemplatesImpl-based gadget chains on JDK 17
+      JAVA_TOOL_OPTIONS: >-
+        --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.trax=ALL-UNNAMED
+        --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.runtime=ALL-UNNAMED
+        --add-opens java.xml/com.sun.org.apache.xml.internal.dtm=ALL-UNNAMED
+        --add-opens java.xml/com.sun.org.apache.xml.internal.utils=ALL-UNNAMED
     labels:
       vuln: "Java 17 deser — jdk17 high-version gadget chains"
       payload: "jchains_native_jdk17_1 jchains_native_jdk17_2"

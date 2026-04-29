@@ -7,11 +7,17 @@ RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/c
 
 # Java 8u102 — before JEP 290 (8u121), before cc1/cc3 patch (8u232)
 # Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_jrmp_client
-# frekele:8u65, adoptopenjdk:8u65, azul:8u65, bellsoft:8u65 all use old Docker v1 manifests
-# incompatible with containerd v2.1. Use azul/zulu-openjdk:8u102 instead (still pre-patch).
+# azul/zulu-openjdk:8u102 uses Ubuntu Xenial base with stale apt repos
 FROM azul/zulu-openjdk:8u102
-# Old base image has stale apt repos; skip apt and copy static curl binary
-COPY --from=curlimages/curl:latest /usr/bin/curl /usr/bin/curl
+# Fix stale apt repos — try Ubuntu old-releases first, then Debian jessie archive
+RUN (echo "deb http://old-releases.ubuntu.com/ubuntu xenial main restricted universe multiverse" > /etc/apt/sources.list \
+     && echo "deb http://old-releases.ubuntu.com/ubuntu xenial-updates main restricted universe multiverse" >> /etc/apt/sources.list \
+     && apt-get update -q 2>/dev/null \
+     && apt-get install -y --no-install-recommends curl ca-certificates) \
+    || (echo "deb [check-valid-until=no] http://archive.debian.org/debian jessie main" > /etc/apt/sources.list \
+        && apt-get -o Acquire::Check-Valid-Until=false update -q \
+        && apt-get install -y --no-install-recommends curl ca-certificates) \
+    && rm -rf /var/lib/apt/lists/* || true
 WORKDIR /app
 COPY --from=build /app/target/deser-app-cc3-1.0.jar app.jar
 EXPOSE 8888

