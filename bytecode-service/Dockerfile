@@ -16,7 +16,16 @@ RUN apt-get update -q && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Java 7 (Zulu) for ysoserial_jdk7u21: AnnotationInvocationHandler serialVersionUID matches Java 7 target
-COPY --from=zulu7 /usr/lib/jvm/zulu-7-amd64 /opt/zulu7
+# Use find to locate the JDK directory regardless of exact path (zulu-7-amd64 or zulu7 etc.)
+RUN --mount=type=bind,from=zulu7,source=/usr/lib/jvm,target=/mnt/zulu-jvms \
+    mkdir -p /opt/zulu7 && \
+    java_bin=$(find /mnt/zulu-jvms -name "java" -path "*/bin/java" -type f 2>/dev/null | head -1) && \
+    if [ -n "$java_bin" ]; then \
+        jdk_dir=$(dirname $(dirname "$java_bin")); \
+        cp -rp "$jdk_dir/." /opt/zulu7/ && echo "[Docker] Copied Java 7 from $jdk_dir"; \
+    else \
+        echo "[Docker] WARN: Java 7 not found in zulu7 image — jdk7u21 will fall back to Java 8"; \
+    fi
 
 COPY --from=builder /build/target/bytecode-service-0.1.0.jar .
 COPY libs ./libs

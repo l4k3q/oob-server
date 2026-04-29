@@ -106,7 +106,7 @@ public class VulnLabServer {
             String json = new String(body, "UTF-8");
             System.out.println("[fastjson] Received: " + json.substring(0, Math.min(json.length(), 200)));
             try {
-                Object obj = com.alibaba.fastjson.JSON.parseObject(json);
+                Object obj = com.alibaba.fastjson.JSON.parse(json); // parse() returns typed obj; parseObject() returns JSONObject wrapper — wont instanceof DataSource
                 // Trigger C3P0 connection pool to execute H2 INIT script (fastjson_c3p0_h2 chain)
                 if (obj instanceof javax.sql.DataSource) {
                     final javax.sql.DataSource ds = (javax.sql.DataSource) obj;
@@ -161,6 +161,16 @@ public class VulnLabServer {
         if (obj instanceof java.security.SignedObject) {
             try { ((java.security.SignedObject) obj).getObject(); } catch (Throwable ignored) {}
         }
+        // Hessian may reconstruct UIDefaults$LazyValue as a live object but not inside a UIDefaults.
+        // Call createValue() directly so SwingLazyValue/ProxyLazyValue gadgets fire.
+        try {
+            Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
+            if (lazyValueClass.isInstance(obj)) {
+                java.lang.reflect.Method cv = lazyValueClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
+                cv.setAccessible(true);
+                cv.invoke(obj, new javax.swing.UIDefaults());
+            }
+        } catch (Throwable ignored) {}
         if (obj instanceof java.util.Map) {
             java.util.Map<?,?> map = (java.util.Map<?,?>) obj;
             for (Object k : new java.util.ArrayList<>(map.keySet())) {
