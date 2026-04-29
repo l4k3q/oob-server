@@ -205,6 +205,18 @@ public class VulnLabServer {
                 try { k.hashCode(); } catch (Throwable ignored) {}
                 try { k.toString(); } catch (Throwable ignored) {}
                 triggerGadgets(k);  // UIDefaults/SignedObject may be nested as a MAP KEY
+                // Also directly check key for LazyValue (belt-and-suspenders for Hessian secondary/bcel
+                // where SwingLazyValue may appear as a map key after deserialization).
+                if (k != null) {
+                    try {
+                        Class<?> lazyKClass = Class.forName("javax.swing.UIDefaults$LazyValue");
+                        if (lazyKClass.isInstance(k)) {
+                            java.lang.reflect.Method cvk = lazyKClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
+                            cvk.setAccessible(true);
+                            cvk.invoke(k, new javax.swing.UIDefaults());
+                        }
+                    } catch (Throwable ignored) {}
+                }
                 Object v = null;
                 try { v = map.get(k); } catch (Throwable ignored) {}
                 if (v != null) triggerGadgets(v);
@@ -243,13 +255,28 @@ public class VulnLabServer {
 
         // java-chains wraps gadgets in a Hessian RPC call frame (method call + args).
         // Try readMethod() + readObject() first; if that fails, fall back to raw readObject().
+        // For Hessian2 endpoints: also try Hessian1 as final fallback because some payloads
+        // (e.g. Hessian2ToStringPayload XBean chain) encode objects using Hessian1 wire format
+        // even when the endpoint is /hessian2 (java-chains implementation detail).
         private Object deserHessian(byte[] body) throws Exception {
             try {
                 com.caucho.hessian.io.AbstractHessianInput rpc = newInput(body);
                 rpc.readMethod();
                 return rpc.readObject();
             } catch (Throwable ignored) {}
-            return newInput(body).readObject();
+            try {
+                return newInput(body).readObject();
+            } catch (Throwable t2) {
+                if (!hessian2) throw t2 instanceof Exception ? (Exception) t2 : new Exception(t2);
+            }
+            // Hessian2 endpoint fallback: try Hessian1 (covers XBean/WritableContext toString chains)
+            try {
+                com.caucho.hessian.io.HessianInput h1rpc = new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
+                h1rpc.readMethod();
+                return h1rpc.readObject();
+            } catch (Throwable ignored) {}
+            com.caucho.hessian.io.HessianInput h1 = new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
+            return h1.readObject();
         }
 
         public void handle(HttpExchange ex) throws IOException {

