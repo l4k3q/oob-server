@@ -107,6 +107,17 @@ public class VulnLabServer {
             System.out.println("[fastjson] Received: " + json.substring(0, Math.min(json.length(), 200)));
             try {
                 Object obj = com.alibaba.fastjson.JSON.parse(json); // parse() returns typed obj; parseObject() returns JSONObject wrapper — wont instanceof DataSource
+                // Fix BCEL ClassLoader for fastjson_bcel chain: Fastjson on JDK 8u482 cannot instantiate
+                // the internal BCEL ClassLoader via @type nesting, so we inject it manually via reflection.
+                if (obj instanceof org.apache.commons.dbcp.BasicDataSource) {
+                    org.apache.commons.dbcp.BasicDataSource bds = (org.apache.commons.dbcp.BasicDataSource) obj;
+                    if (bds.getDriverClassName() != null && bds.getDriverClassName().startsWith("$$BCEL$$")) {
+                        try {
+                            Class<?> bcelCL = Class.forName("com.sun.org.apache.bcel.internal.util.ClassLoader");
+                            bds.setDriverClassLoader((ClassLoader) bcelCL.newInstance());
+                        } catch (Throwable ignored) {}
+                    }
+                }
                 // Trigger C3P0 connection pool to execute H2 INIT script (fastjson_c3p0_h2 chain)
                 if (obj instanceof javax.sql.DataSource) {
                     final javax.sql.DataSource ds = (javax.sql.DataSource) obj;
@@ -180,6 +191,19 @@ public class VulnLabServer {
                 Object v = null;
                 try { v = map.get(k); } catch (Throwable ignored) {}
                 if (v != null) triggerGadgets(v);
+                // Hessian secondary/bcel: SwingLazyValue may be a MAP VALUE inside a nested Map.
+                // Calling triggerGadgets(v) recurses but we also call createValue() directly here
+                // for LazyValue instances found as values (complements the direct-object check above).
+                if (v != null) {
+                    try {
+                        Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
+                        if (lazyValueClass.isInstance(v)) {
+                            java.lang.reflect.Method cv = lazyValueClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
+                            cv.setAccessible(true);
+                            cv.invoke(v, new javax.swing.UIDefaults());
+                        }
+                    } catch (Throwable ignored) {}
+                }
             }
         }
         if (obj instanceof java.util.Collection) {
