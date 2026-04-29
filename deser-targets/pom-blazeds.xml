@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.vulnlab</groupId>
+  <artifactId>deser-app-blazeds</artifactId>
+  <version>1.0</version>
+  <packaging>jar</packaging>
+  <properties>
+    <maven.compiler.source>8</maven.compiler.source>
+    <maven.compiler.target>8</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <repositories>
+    <!-- BlazeDS artifacts are hosted in Adobe/Apache repo -->
+    <repository>
+      <id>central</id>
+      <url>https://repo1.maven.org/maven2</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <!-- ── BlazeDS 4.7.3 — AMF3 deserialization endpoint ── -->
+    <!-- BlazeDS common: AMF3 MessageBroker, AMFEndpoint, flex.messaging.* -->
+    <dependency>
+      <groupId>com.adobe.blazeds</groupId>
+      <artifactId>blazeds-common</artifactId>
+      <version>4.7.3.1</version>
+    </dependency>
+    <!-- BlazeDS core: MessageBrokerServlet, channels, flex.messaging.io.* -->
+    <dependency>
+      <groupId>com.adobe.blazeds</groupId>
+      <artifactId>blazeds-core</artifactId>
+      <version>4.7.3.1</version>
+    </dependency>
+    <!-- BlazeDS remoting: RemotingService, JavaAdapter -->
+    <dependency>
+      <groupId>com.adobe.blazeds</groupId>
+      <artifactId>blazeds-remoting</artifactId>
+      <version>4.7.3.1</version>
+    </dependency>
+
+    <!-- ── Gadget dependencies (must be on classpath for exploit chains) ── -->
+    <!-- CC3.2.1 — CommonsCollectionsK1/K3, ChainedTransformer, LazyMap -->
+    <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
+      <version>3.2.1</version>
+    </dependency>
+    <!-- CC4.0 — CommonsCollectionsK2/K4, PriorityQueue, TransformingComparator -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+      <version>4.0</version>
+    </dependency>
+    <!-- CB1.9.4 — CommonsBeanutils1, TemplatesImpl, BeanComparator -->
+    <dependency>
+      <groupId>commons-beanutils</groupId>
+      <artifactId>commons-beanutils</artifactId>
+      <version>1.9.4</version>
+    </dependency>
+    <!-- commons-logging (transitive requirement for BeanUtils) -->
+    <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
+      <version>1.2</version>
+    </dependency>
+
+    <!-- ── Servlet API (provided by embedded container) ── -->
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>javax.servlet-api</artifactId>
+      <version>3.1.0</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- ── Embedded Tomcat (to host the AMF endpoint as standalone JAR) ── -->
+    <dependency>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-core</artifactId>
+      <version>8.5.99</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-jasper</artifactId>
+      <version>8.5.99</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <sourceDirectory>.</sourceDirectory>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.4.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.vulnlab.blazeds.BlazeDSApp</mainClass>
+                </transformer>
+                <!-- Merge service files so servlet mappings are preserved -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

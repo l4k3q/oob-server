@@ -1,0 +1,47 @@
+# ── BlazeDS AMF3 deserialization target ──────────────────────────────────────
+# Vuln chain: jchains_blazeds_axis2
+#   Payload: BlazeDSAMF3AMPayload (java-chains)
+#   Gadgets: Axis2MetaDataEntry → CB1 → TemplatesImpl → bytecode exec
+#   Protocol: HTTP POST /messagebroker/amf  (application/x-amf)
+#
+# BlazeDS 4.7.3 AMF3 deserializes arbitrary objects via Amf3Input.readObject().
+# The Axis2 gadget encodes a crafted AMF3 message that triggers CB1 during
+# property assignment, then chains into TemplatesImpl bytecode execution.
+#
+# Classpath gadgets bundled:
+#   blazeds-common 4.7.3.1
+#   commons-collections 3.2.1   (CC3)
+#   commons-collections4 4.0    (CC4)
+#   commons-beanutils 1.9.4     (CB1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: Maven build ──────────────────────────────────────────────────────
+FROM maven:3.8-openjdk-8 AS build
+WORKDIR /app
+
+COPY pom-blazeds.xml pom.xml
+RUN mvn -q dependency:go-offline
+
+COPY BlazeDSApp.java .
+RUN mkdir -p src/main/java/com/vulnlab/blazeds \
+    && mv BlazeDSApp.java src/main/java/com/vulnlab/blazeds/ \
+    && mvn -q package -DskipTests
+
+# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
+FROM openjdk:8-jre-slim
+
+RUN apt-get update -q \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /app/target/deser-app-blazeds-1.0.jar app.jar
+
+EXPOSE 8080
+ENV PORT=8080
+
+# Health check — tests AMF endpoint is live
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -sf http://localhost:${PORT}/health || exit 1
+
+CMD ["java", "-jar", "app.jar"]
