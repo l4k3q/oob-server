@@ -167,6 +167,29 @@ public class VulnLabServer {
     // UIDefaults lazy values (SwingLazyValue/ProxyLazyValue) only fire on UIDefaults.get(key),
     // NOT on toString(). SignedObject secondary deserialization fires on getObject() call.
     // HashMap/TreeMap key chains fire on hashCode()/compareTo() during Map operations.
+    static void triggerLazyValue(Object obj) {
+        if (obj == null) return;
+        try {
+            Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
+            if (lazyValueClass.isInstance(obj)) {
+                // Method 1: call createValue() directly with a fresh UIDefaults
+                try {
+                    java.lang.reflect.Method cv = lazyValueClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
+                    cv.setAccessible(true);
+                    cv.invoke(obj, new javax.swing.UIDefaults());
+                } catch (Throwable ignored) {}
+                // Method 2: put the LazyValue into a UIDefaults and call get() — this invokes
+                // createValue(this) with the UIDefaults as the table context, matching the
+                // natural execution path that UIDefaults.get() uses internally.
+                try {
+                    javax.swing.UIDefaults ud = new javax.swing.UIDefaults();
+                    ud.put("_k_", obj);
+                    ud.get("_k_");
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+    }
+
     static void triggerGadgets(Object obj) {
         if (obj == null) return;
         // Always trigger toString/hashCode — fires Rome/ObjectBean/ToStringBean gadgets
@@ -182,48 +205,21 @@ public class VulnLabServer {
             try { ((java.security.SignedObject) obj).getObject(); } catch (Throwable ignored) {}
         }
         // Hessian may reconstruct UIDefaults$LazyValue as a live object but not inside a UIDefaults.
-        // Call createValue() directly so SwingLazyValue/ProxyLazyValue gadgets fire.
-        try {
-            Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
-            if (lazyValueClass.isInstance(obj)) {
-                java.lang.reflect.Method cv = lazyValueClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
-                cv.setAccessible(true);
-                cv.invoke(obj, new javax.swing.UIDefaults());
-            }
-        } catch (Throwable ignored) {}
+        // Try both direct createValue() and UIDefaults.get() to cover all execution paths.
+        triggerLazyValue(obj);
         if (obj instanceof java.util.Map) {
             java.util.Map<?,?> map = (java.util.Map<?,?>) obj;
             for (Object k : new java.util.ArrayList<>(map.keySet())) {
                 try { k.hashCode(); } catch (Throwable ignored) {}
                 try { k.toString(); } catch (Throwable ignored) {}
-                triggerGadgets(k);  // UIDefaults/SignedObject may be nested as a MAP KEY
-                // Also directly check key for LazyValue (belt-and-suspenders for Hessian secondary/bcel
-                // where SwingLazyValue may appear as a map key after deserialization).
-                if (k != null) {
-                    try {
-                        Class<?> lazyKClass = Class.forName("javax.swing.UIDefaults$LazyValue");
-                        if (lazyKClass.isInstance(k)) {
-                            java.lang.reflect.Method cvk = lazyKClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
-                            cvk.setAccessible(true);
-                            cvk.invoke(k, new javax.swing.UIDefaults());
-                        }
-                    } catch (Throwable ignored) {}
-                }
+                // UIDefaults/SignedObject/LazyValue may be nested as a MAP KEY
+                triggerGadgets(k);
+                triggerLazyValue(k);
                 Object v = null;
                 try { v = map.get(k); } catch (Throwable ignored) {}
-                if (v != null) triggerGadgets(v);
-                // Hessian secondary/bcel: SwingLazyValue may be a MAP VALUE inside a nested Map.
-                // Calling triggerGadgets(v) recurses but we also call createValue() directly here
-                // for LazyValue instances found as values (complements the direct-object check above).
                 if (v != null) {
-                    try {
-                        Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
-                        if (lazyValueClass.isInstance(v)) {
-                            java.lang.reflect.Method cv = lazyValueClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
-                            cv.setAccessible(true);
-                            cv.invoke(v, new javax.swing.UIDefaults());
-                        }
-                    } catch (Throwable ignored) {}
+                    triggerGadgets(v);
+                    triggerLazyValue(v);
                 }
             }
         }
