@@ -276,6 +276,10 @@ def test_deser_chain(chain_id, params=None, target_url=None, container_name="vul
         return
     ok, ev = wait_callback(tok)
     rce_ok = verify_rce_file(container_name, tok)
+    if not ok and not rce_ok:
+        # Async exec may still be completing — retry file check after brief delay
+        time.sleep(5)
+        rce_ok = verify_rce_file(container_name, tok)
     if ok or rce_ok:
         note = f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}" if ok else "no OOB (file-based RCE)"
         if rce_ok:
