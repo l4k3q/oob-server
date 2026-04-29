@@ -29,6 +29,9 @@ public class VulnLabServer {
         System.setProperty("com.sun.jndi.ldap.object.trustURLCodebase", "true");
         System.setProperty("com.sun.jndi.rmi.object.trustURLCodebase", "true");
         System.setProperty("com.sun.jndi.ldap.object.trustSerialData", "true");
+        // Fix jchains_native_c3p0_el / jchains_native_c3p0_ldap: ensure JNDI context provider is registered
+        System.setProperty("java.naming.factory.initial", "com.sun.jndi.ldap.LdapCtxFactory");
+        System.setProperty("java.naming.provider.url", "ldap://host.docker.internal:1389");
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 8888;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/deser",    new DeserHandler());
@@ -115,8 +118,21 @@ public class VulnLabServer {
                     if (bds.getDriverClassName() != null && bds.getDriverClassName().startsWith("$$BCEL$$")) {
                         try {
                             Class<?> bcelCL = Class.forName("com.sun.org.apache.bcel.internal.util.ClassLoader");
-                            bds.setDriverClassLoader((ClassLoader) bcelCL.newInstance());
-                        } catch (Throwable ignored) {}
+                            // Use getDeclaredConstructors() to find accessible constructor via reflection
+                            java.lang.reflect.Constructor<?> c = bcelCL.getDeclaredConstructors()[0];
+                            c.setAccessible(true);
+                            Object loader;
+                            if (c.getParameterCount() == 0) {
+                                loader = c.newInstance();
+                            } else {
+                                // Pass parent classloader if constructor requires one
+                                loader = c.newInstance(Thread.currentThread().getContextClassLoader());
+                            }
+                            bds.setDriverClassLoader((ClassLoader) loader);
+                            System.out.println("[fastjson] BCEL classloader injected: " + loader.getClass().getName());
+                        } catch (Throwable t) {
+                            System.out.println("[fastjson] BCEL inject failed: " + t + " cause=" + t.getCause());
+                        }
                     }
                 }
                 // Trigger C3P0 connection pool to execute H2 INIT script (fastjson_c3p0_h2 chain)
@@ -286,7 +302,34 @@ public class VulnLabServer {
             new Thread(() -> {
                 try {
                     Class.forName("org.h2.Driver");
-                    java.sql.Connection c = java.sql.DriverManager.getConnection(url, "sa", "");
+                    // Fix H2 1.4.197 INIT truncation: extract INIT SQL and execute separately
+                    // to avoid H2 URL parser stopping at ';' inside method body
+                    String initSql = null;
+                    String baseUrl = url;
+                    int initIdx = url.indexOf(";INIT=");
+                    if (initIdx < 0) initIdx = url.indexOf(";init=");
+                    if (initIdx >= 0) {
+                        baseUrl = url.substring(0, initIdx);
+                        // Everything after ";INIT=" is the SQL (may use \; as statement separator)
+                        String rest = url.substring(initIdx + 6);
+                        initSql = rest;
+                    }
+                    java.sql.Connection c = java.sql.DriverManager.getConnection(baseUrl, "sa", "");
+                    if (initSql != null) {
+                        System.out.println("[h2jdbc] Executing INIT SQL manually: " + initSql.substring(0, Math.min(initSql.length(), 200)));
+                        try (java.sql.Statement stmt = c.createStatement()) {
+                            // Split on \; (escaped semicolons used as statement separators in H2 INIT URLs)
+                            for (String sql : initSql.split("\\\\;")) {
+                                String trimmed = sql.trim();
+                                if (!trimmed.isEmpty()) {
+                                    System.out.println("[h2jdbc] Executing: " + trimmed);
+                                    try { stmt.execute(trimmed); } catch (Throwable se) {
+                                        System.out.println("[h2jdbc] SQL error: " + se.getMessage());
+                                    }
+                                }
+                            }
+                        }
+                    }
                     c.close();
                 } catch (Throwable t) {
                     System.out.println("[h2jdbc] Exception: " + t.getMessage());
