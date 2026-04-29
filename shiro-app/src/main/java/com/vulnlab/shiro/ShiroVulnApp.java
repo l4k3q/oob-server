@@ -35,6 +35,7 @@ public class ShiroVulnApp {
         server.createContext("/login",     new RememberMeHandler("CBC"));
         server.createContext("/login-gcm", new RememberMeHandler("GCM"));
         server.createContext("/health",    new HealthHandler());
+        server.createContext("/check-rce", new CheckRceHandler());
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
         System.out.println("[ShiroVuln] Listening on port " + port);
@@ -102,10 +103,34 @@ public class ShiroVulnApp {
         }
     }
 
+    static class CheckRceHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange ex) throws IOException {
+            java.io.File tmp = new java.io.File("/tmp");
+            java.io.File[] files = tmp.listFiles();
+            int count = 0;
+            StringBuilder sb = new StringBuilder("[");
+            if (files != null) {
+                for (java.io.File f : files) {
+                    if (f.getName().startsWith("oobx_")) {
+                        if (count > 0) sb.append(",");
+                        sb.append("\"").append(f.getName()).append("\"");
+                        count++;
+                    }
+                }
+            }
+            sb.append("]");
+            byte[] b = ("{\"rce_files\":" + sb + ",\"count\":" + count + "}").getBytes();
+            ex.sendResponseHeaders(200, b.length);
+            ex.getResponseBody().write(b);
+            ex.getResponseBody().close();
+        }
+    }
+
     static class HealthHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
-            byte[] b = "{\"status\":\"ok\",\"endpoints\":[\"/login\",\"/login-gcm\"]}".getBytes();
+            byte[] b = "{\"status\":\"ok\",\"endpoints\":[\"/login\",\"/login-gcm\",\"/check-rce\"]}".getBytes();
             ex.sendResponseHeaders(200, b.length);
             ex.getResponseBody().write(b);
             ex.getResponseBody().close();

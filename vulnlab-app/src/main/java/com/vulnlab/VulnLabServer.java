@@ -34,6 +34,7 @@ public class VulnLabServer {
         server.createContext("/hessian2", new HessianHandler(true));
         server.createContext("/log4shell", new Log4ShellHandler());
         server.createContext("/h2jdbc",   new H2JdbcHandler());
+        server.createContext("/check-rce", new CheckRceHandler());
         server.createContext("/health",   new HealthHandler());
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
@@ -209,9 +210,29 @@ public class VulnLabServer {
         }
     }
 
+    static class CheckRceHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            String query = ex.getRequestURI().getQuery();
+            String prefix = (query != null && query.startsWith("f=")) ? query.substring(2) : "";
+            // List files in /tmp matching oobx_* prefix
+            java.io.File tmp = new java.io.File("/tmp");
+            java.io.File[] files = tmp.listFiles();
+            java.util.List<String> found = new java.util.ArrayList<>();
+            if (files != null) {
+                for (java.io.File f : files) {
+                    if (f.getName().startsWith("oobx_") &&
+                        (prefix.isEmpty() || f.getName().startsWith("oobx_" + prefix))) {
+                        found.add(f.getName());
+                    }
+                }
+            }
+            respond(ex, 200, "{\"rce_files\":" + found.toString().replace("[","[\"").replace("]","\"]").replace(", ","\",\"") + ",\"count\":" + found.size() + "}");
+        }
+    }
+
     static class HealthHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
-            respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\",\"/h2jdbc\"]}");
+            respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\",\"/h2jdbc\",\"/check-rce\"]}");
         }
     }
 }

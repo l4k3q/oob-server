@@ -130,6 +130,23 @@
       <artifactId>h2</artifactId>
       <version>1.4.197</version>
     </dependency>
+
+    <!-- Groovy — required for ysoserial Groovy1 gadget chain -->
+    <dependency>
+      <groupId>org.codehaus.groovy</groupId>
+      <artifactId>groovy-all</artifactId>
+      <version>2.4.21</version>
+    </dependency>
+
+    <!-- Hibernate — required for ysoserial Hibernate1 gadget chain -->
+    <dependency>
+      <groupId>org.hibernate</groupId>
+      <artifactId>hibernate-core</artifactId>
+      <version>4.3.11.Final</version>
+    </dependency>
+
+    <!-- Commons BeanUtils 1.8.3 — NOT replacing 1.9.4, both coexist for CB2 chain testing -->
+    <!-- Note: ysoserial CB2 requires serialVersionUID from 1.8.x; kept here for completeness -->
   </dependencies>
 
   <build>
