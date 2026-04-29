@@ -130,7 +130,7 @@ public class VulnLabServer {
                 // Trigger C3P0 connection pool to execute H2 INIT script (fastjson_c3p0_h2 chain)
                 if (obj instanceof javax.sql.DataSource) {
                     final javax.sql.DataSource ds = (javax.sql.DataSource) obj;
-                    new Thread(() -> { try { ds.getConnection(); } catch (Throwable ignored) {} }, "fastjson-c3p0").start();
+                    new Thread(() -> { try { ds.getConnection(); } catch (Throwable t) { System.out.println("[fastjson-c3p0] getConnection error: " + t + " cause=" + t.getCause()); if (t.getCause()!=null) t.getCause().printStackTrace(); } }, "fastjson-c3p0").start();
                 } else if (obj instanceof javax.sql.ConnectionPoolDataSource) {
                     final javax.sql.ConnectionPoolDataSource cpds = (javax.sql.ConnectionPoolDataSource) obj;
                     new Thread(() -> { try { cpds.getPooledConnection(); } catch (Throwable ignored) {} }, "fastjson-c3p0").start();

