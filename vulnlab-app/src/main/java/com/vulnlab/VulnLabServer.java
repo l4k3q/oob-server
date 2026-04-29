@@ -7,6 +7,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.*;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
 
@@ -29,9 +30,12 @@ public class VulnLabServer {
         System.setProperty("com.sun.jndi.ldap.object.trustURLCodebase", "true");
         System.setProperty("com.sun.jndi.rmi.object.trustURLCodebase", "true");
         System.setProperty("com.sun.jndi.ldap.object.trustSerialData", "true");
-        // Fix jchains_native_c3p0_el / jchains_native_c3p0_ldap: ensure JNDI context provider is registered
+        // Register LDAP JNDI context factory for jchains_native_c3p0_el / jchains_native_c3p0_ldap.
+        // C3P0 PoolBackedDataSourceBase.readObject() calls new InitialContext() to resolve the
+        // embedded Reference; without a registered InitialContext factory the resolution fails
+        // with "Failed to acquire the Context necessary to lookup an Object".
         System.setProperty("java.naming.factory.initial", "com.sun.jndi.ldap.LdapCtxFactory");
-        System.setProperty("java.naming.provider.url", "ldap://host.docker.internal:1389");
+        System.setProperty("java.naming.provider.url",    "ldap://host.docker.internal:1389");
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 8888;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/deser",    new DeserHandler());
@@ -163,33 +167,124 @@ public class VulnLabServer {
         }
     }
 
-    // Trigger lazy gadget values that are only activated by explicit access.
-    // UIDefaults lazy values (SwingLazyValue/ProxyLazyValue) only fire on UIDefaults.get(key),
-    // NOT on toString(). SignedObject secondary deserialization fires on getObject() call.
-    // HashMap/TreeMap key chains fire on hashCode()/compareTo() during Map operations.
+    // ── Lazy value / gadget triggers ───────────────────────────────────────────
+
+    /**
+     * Trigger UIDefaults$LazyValue gadgets found in the deserialized Hessian object tree.
+     *
+     * Root cause analysis:
+     * - SwingLazyValue.createValue() calls Class.forName(name, true, NULL) — bootstrap ClassLoader.
+     *   Application classes (org.springframework.util.SerializationUtils) are NOT on the bootstrap
+     *   path, so the call silently fails and returns null without executing the inner payload.
+     *   Fix: detect the secondary chain pattern and call ObjectInputStream.readObject() on args[0]
+     *   (the serialized inner CB1 payload) directly, bypassing the broken ClassLoader path.
+     *
+     * - ProxyLazyValue with JavaWrapper._main: Hessian deserializes String[] args as Object[], so
+     *   ProxyLazyValue.getClassArray() computes Object[].class instead of String[].class, causing
+     *   Class.getMethod("_main", Object[].class) to throw NoSuchMethodException.
+     *   Fix: detect the BCEL chain pattern, extract the $$BCEL$$ class string, and call
+     *   JavaWrapper._main(String[]{bcelClassName}) directly with the correct type.
+     *
+     * - ProxyLazyValue (generic): uses Thread context ClassLoader, so createValue() CAN find app
+     *   classes. Pass a UIDefaults table with the "ClassLoader" key set to the app ClassLoader
+     *   to ensure correct class resolution.
+     */
     static void triggerLazyValue(Object obj) {
         if (obj == null) return;
         try {
             Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
-            if (lazyValueClass.isInstance(obj)) {
-                // Method 1: call createValue() directly with a fresh UIDefaults
-                try {
-                    java.lang.reflect.Method cv = lazyValueClass.getDeclaredMethod("createValue", javax.swing.UIDefaults.class);
-                    cv.setAccessible(true);
-                    cv.invoke(obj, new javax.swing.UIDefaults());
+            if (!lazyValueClass.isInstance(obj)) return;
+
+            // SwingLazyValue fields: c (class), m (method), a (args)
+            // ProxyLazyValue fields: c (class), m (method), args (args)
+            String className  = getFieldStr(obj, "c");
+            String methodName = getFieldStr(obj, "m");
+            Object[] args     = getFieldArr(obj, "a");
+            if (args == null) args = getFieldArr(obj, "args");  // ProxyLazyValue uses "args"
+            System.out.println("[lazy] class=" + className + " method=" + methodName + " args=" + (args==null?"null":args.length));
+
+            // ── SwingLazyValue secondary chain ────────────────────────────────
+            // className = "org.springframework.util.SerializationUtils"
+            // methodName = "deserialize", args[0] = byte[] (inner serialized payload)
+            // SwingLazyValue uses null (bootstrap) ClassLoader → Spring class not found.
+            // Directly deserialize the inner payload with ObjectInputStream instead.
+            if ("org.springframework.util.SerializationUtils".equals(className)
+                    && "deserialize".equals(methodName)
+                    && args != null && args.length > 0 && args[0] instanceof byte[]) {
+                byte[] innerBytes = (byte[]) args[0];
+                try (ObjectInputStream ois =
+                         new ObjectInputStream(new ByteArrayInputStream(innerBytes))) {
+                    ois.readObject();
                 } catch (Throwable ignored) {}
-                // Method 2: put the LazyValue into a UIDefaults and call get() — this invokes
-                // createValue(this) with the UIDefaults as the table context, matching the
-                // natural execution path that UIDefaults.get() uses internally.
-                try {
-                    javax.swing.UIDefaults ud = new javax.swing.UIDefaults();
-                    ud.put("_k_", obj);
-                    ud.get("_k_");
-                } catch (Throwable ignored) {}
+                return;
             }
+
+            // ── ProxyLazyValue BCEL chain ─────────────────────────────────────
+            // className = "com.sun.org.apache.bcel.internal.util.JavaWrapper"
+            // methodName = "_main", args[0] = Object[]{"$$BCEL$$..."} (Hessian downcasts String[])
+            // ProxyLazyValue.getClassArray() sees Object[] → looks for _main(Object[]), fails.
+            // Directly call JavaWrapper._main(String[]{bcelClass}) with correct type.
+            if ("com.sun.org.apache.bcel.internal.util.JavaWrapper".equals(className)
+                    && "_main".equals(methodName)
+                    && args != null && args.length > 0) {
+                Object inner = args[0];
+                String bcelClass = null;
+                if (inner instanceof String) {
+                    bcelClass = (String) inner;
+                } else if (inner instanceof Object[]) {
+                    Object[] innerArr = (Object[]) inner;
+                    if (innerArr.length > 0 && innerArr[0] instanceof String)
+                        bcelClass = (String) innerArr[0];
+                }
+                if (bcelClass != null && bcelClass.startsWith("$$BCEL$$")) {
+                    try {
+                        Class<?> jw = Class.forName("com.sun.org.apache.bcel.internal.util.JavaWrapper",
+                                true, Thread.currentThread().getContextClassLoader());
+                        java.lang.reflect.Method m = jw.getDeclaredMethod("_main", String[].class);
+                        m.invoke(null, (Object) new String[]{bcelClass});
+                    } catch (Throwable ignored) {}
+                }
+                return;
+            }
+
+            // ── Generic ProxyLazyValue ─────────────────────────────────────────
+            // ProxyLazyValue uses Thread context ClassLoader — register it explicitly in
+            // the UIDefaults table so createValue() finds application classes.
+            javax.swing.UIDefaults ud = new javax.swing.UIDefaults();
+            ud.put("ClassLoader", Thread.currentThread().getContextClassLoader());
+            ud.put("_k_", obj);
+            try { ud.get("_k_"); } catch (Throwable ignored) {}
         } catch (Throwable ignored) {}
     }
 
+    private static String getFieldStr(Object obj, String name) {
+        try {
+            Field f = findDeclaredField(obj.getClass(), name);
+            if (f != null) { f.setAccessible(true); Object v = f.get(obj); return v instanceof String ? (String) v : null; }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static Object[] getFieldArr(Object obj, String name) {
+        try {
+            Field f = findDeclaredField(obj.getClass(), name);
+            if (f != null) { f.setAccessible(true); Object v = f.get(obj); return v instanceof Object[] ? (Object[]) v : null; }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static Field findDeclaredField(Class<?> cls, String name) {
+        Class<?> c = cls;
+        while (c != null) {
+            try { return c.getDeclaredField(name); } catch (NoSuchFieldException ignored) { c = c.getSuperclass(); }
+        }
+        return null;
+    }
+
+    // Trigger lazy gadget values that are only activated by explicit access.
+    // UIDefaults lazy values (SwingLazyValue/ProxyLazyValue) only fire on UIDefaults.get(key),
+    // NOT on toString(). SignedObject secondary deserialization fires on getObject() call.
+    // HashMap/TreeMap key chains fire on hashCode()/compareTo() during Map operations.
     static void triggerGadgets(Object obj) {
         if (obj == null) return;
         // Always trigger toString/hashCode — fires Rome/ObjectBean/ToStringBean gadgets
@@ -205,22 +300,17 @@ public class VulnLabServer {
             try { ((java.security.SignedObject) obj).getObject(); } catch (Throwable ignored) {}
         }
         // Hessian may reconstruct UIDefaults$LazyValue as a live object but not inside a UIDefaults.
-        // Try both direct createValue() and UIDefaults.get() to cover all execution paths.
+        // Call triggerLazyValue() which handles SwingLazyValue/ProxyLazyValue chain-specific triggers.
         triggerLazyValue(obj);
         if (obj instanceof java.util.Map) {
             java.util.Map<?,?> map = (java.util.Map<?,?>) obj;
             for (Object k : new java.util.ArrayList<>(map.keySet())) {
                 try { k.hashCode(); } catch (Throwable ignored) {}
                 try { k.toString(); } catch (Throwable ignored) {}
-                // UIDefaults/SignedObject/LazyValue may be nested as a MAP KEY
-                triggerGadgets(k);
-                triggerLazyValue(k);
+                triggerGadgets(k);  // UIDefaults/SignedObject/LazyValue may be nested as a MAP KEY
                 Object v = null;
                 try { v = map.get(k); } catch (Throwable ignored) {}
-                if (v != null) {
-                    triggerGadgets(v);
-                    triggerLazyValue(v);
-                }
+                if (v != null) triggerGadgets(v);
             }
         }
         if (obj instanceof java.util.Collection) {
