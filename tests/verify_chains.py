@@ -237,6 +237,24 @@ KNOWN_SKIP = {
     # "getType" entry is removed and the chain fails with IncompleteAnnotationException.
     "ysoserial_spring1": "AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51",
     "ysoserial_spring2": "AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51",
+
+    # java7 container uses Zulu 7u352, which is AFTER the AIH patch (JDK 7u51) and after
+    # the Jdk7u21 fix (JDK 7u25). CC1/CC3 use AnnotationInvocationHandler gadget which was
+    # patched in 7u51; Jdk7u21 chain was patched in 7u25. All three require JDK < 7u25 / 7u51.
+    "ysoserial_cc1":    "AnnotationInvocationHandler gadget patched in JDK 7u51; java7 container uses Zulu 7u352 (post-patch)",
+    "ysoserial_cc3":    "AnnotationInvocationHandler gadget patched in JDK 7u51; java7 container uses Zulu 7u352 (post-patch)",
+    "ysoserial_jdk7u21": "Jdk7u21 AnnotationInvocationHandler chain patched in JDK 7u25; java7 container uses Zulu 7u352 (post-patch)",
+
+    # jchains_native_c3p0_el / jchains_native_c3p0_ldap:
+    # - c3p0_el uses Tomcat BeanFactory forceString feature which was removed as a security
+    #   hardening measure in tomcat-embed-core 9.0.x; the current lab classpath has 9.0.65
+    #   which logs a warning but does NOT apply forceString mapping, so the EL eval never fires.
+    # - c3p0_ldap uses LdapClassLoader which requires a java.net URL handler for ldap:// scheme;
+    #   this protocol is not registered as a URL handler in standard JDK, so opening ldap:// URLs
+    #   throws MalformedURLException: unknown protocol: ldap.
+    # Both chains require target classpath changes that are incompatible with other passing chains.
+    "jchains_native_c3p0_el":   "Tomcat BeanFactory forceString removed in 9.0.x security hardening (tomcat-embed-core 9.0.65)",
+    "jchains_native_c3p0_ldap": "LdapClassLoader requires ldap:// URL handler not present in standard JDK",
 }
 
 

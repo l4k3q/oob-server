@@ -195,13 +195,11 @@ public class VulnLabServer {
             Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
             if (!lazyValueClass.isInstance(obj)) return;
 
-            // SwingLazyValue fields: c (class), m (method), a (args)
-            // ProxyLazyValue fields: c (class), m (method), args (args)
-            String className  = getFieldStr(obj, "c");
-            String methodName = getFieldStr(obj, "m");
-            Object[] args     = getFieldArr(obj, "a");
-            if (args == null) args = getFieldArr(obj, "args");  // ProxyLazyValue uses "args"
-            System.out.println("[lazy] class=" + className + " method=" + methodName + " args=" + (args==null?"null":args.length));
+            // SwingLazyValue fields: className, methodName, args
+            // ProxyLazyValue fields: className, methodName, args (same names, different ClassLoader behavior)
+            String className  = getFieldStr(obj, "className");
+            String methodName = getFieldStr(obj, "methodName");
+            Object[] args     = getFieldArr(obj, "args");
 
             // ── SwingLazyValue secondary chain ────────────────────────────────
             // className = "org.springframework.util.SerializationUtils"
@@ -292,6 +290,30 @@ public class VulnLabServer {
         try { obj.toString(); } catch (Throwable ignored) {}
         if (obj instanceof javax.swing.UIDefaults) {
             javax.swing.UIDefaults ud = (javax.swing.UIDefaults) obj;
+            // First: extract RAW values from Hashtable (bypassing UIDefaults.get() lazy eval)
+            // so we can call triggerLazyValue() on SwingLazyValue/ProxyLazyValue objects directly.
+            // If we called ud.get(k) first, UIDefaults would call createValue() on LazyValues;
+            // SwingLazyValue.createValue() fails silently (bootstrap ClassLoader), consuming the
+            // LazyValue and replacing it with null before we can apply our fix.
+            try {
+                java.lang.reflect.Field tableField = findDeclaredField(java.util.Hashtable.class, "table");
+                if (tableField != null) {
+                    tableField.setAccessible(true);
+                    Object[] table = (Object[]) tableField.get(ud);
+                    if (table != null) {
+                        for (Object entry : table) {
+                            if (entry == null) continue;
+                            java.lang.reflect.Field valueField = findDeclaredField(entry.getClass(), "value");
+                            if (valueField != null) {
+                                valueField.setAccessible(true);
+                                Object rawVal = valueField.get(entry);
+                                triggerLazyValue(rawVal);  // fire SwingLazyValue/ProxyLazyValue directly
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+            // Also call ud.get(k) for other (non-lazy) UIDefaults entries
             for (Object k : new java.util.ArrayList<>(ud.keySet())) {
                 try { ud.get(k); } catch (Throwable ignored) {}
             }

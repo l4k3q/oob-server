@@ -185,10 +185,19 @@
       <version>9.0.65</version>
     </dependency>
 
-    <!-- XBean Reflect — required for jchains_hessian2_tostring_xbean -->
+    <!-- XBean Reflect — required for jchains_hessian2_tostring_xbean gadget chain -->
     <dependency>
       <groupId>org.apache.xbean</groupId>
       <artifactId>xbean-reflect</artifactId>
+      <version>4.23</version>
+    </dependency>
+    <!-- XBean Naming — WritableContext and ContextUtil$ReadOnlyBinding used by
+         Hessian2ToStringPayload XBeanToString gadget chain (jchains_hessian2_tostring_xbean).
+         Without this dep, Hessian deserialization fails with ClassNotFoundException for
+         org.apache.xbean.naming.context.WritableContext. -->
+    <dependency>
+      <groupId>org.apache.xbean</groupId>
+      <artifactId>xbean-naming</artifactId>
       <version>4.23</version>
     </dependency>
 
