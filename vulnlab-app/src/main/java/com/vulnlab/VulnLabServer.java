@@ -117,7 +117,7 @@ public class VulnLabServer {
                     org.apache.commons.dbcp.BasicDataSource bds = (org.apache.commons.dbcp.BasicDataSource) obj;
                     if (bds.getDriverClassName() != null && bds.getDriverClassName().startsWith("$$BCEL$$")) {
                         try {
-                            Class<?> bcelCL = Class.forName("org.apache.bcel.util.ClassLoader");
+                            Class<?> bcelCL = Class.forName("com.sun.org.apache.bcel.internal.util.ClassLoader");
                             // Use getConstructor() to explicitly get the public no-arg constructor
                             ClassLoader loader = (ClassLoader) bcelCL.getConstructor().newInstance();
                             bds.setDriverClassLoader(loader);

