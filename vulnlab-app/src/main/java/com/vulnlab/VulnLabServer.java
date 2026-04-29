@@ -117,7 +117,7 @@ public class VulnLabServer {
                     org.apache.commons.dbcp.BasicDataSource bds = (org.apache.commons.dbcp.BasicDataSource) obj;
                     if (bds.getDriverClassName() != null && bds.getDriverClassName().startsWith("$$BCEL$$")) {
                         try {
-                            Class<?> bcelCL = Class.forName("com.sun.org.apache.bcel.internal.util.ClassLoader");
+                            Class<?> bcelCL = Class.forName("org.apache.bcel.util.ClassLoader");
                             // Use getDeclaredConstructors() to find accessible constructor via reflection
                             java.lang.reflect.Constructor<?> c = bcelCL.getDeclaredConstructors()[0];
                             c.setAccessible(true);

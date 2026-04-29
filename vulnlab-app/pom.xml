@@ -124,6 +124,15 @@
       <version>1.4</version>
     </dependency>
 
+    <!-- Apache Commons BCEL — standalone BCEL ClassLoader for fastjson_bcel chain.
+         JDK 8u482 internal com.sun.org.apache.bcel.internal.util.ClassLoader has
+         security restrictions; standalone BCEL 6.x still supports $$BCEL$$ loading. -->
+    <dependency>
+      <groupId>org.apache.bcel</groupId>
+      <artifactId>bcel</artifactId>
+      <version>6.6.1</version>
+    </dependency>
+
     <!-- Jackson Databind — required for Jackson gadget chains -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>

