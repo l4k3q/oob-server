@@ -137,6 +137,9 @@ public class VulnLabServer {
     // HashMap/TreeMap key chains fire on hashCode()/compareTo() during Map operations.
     static void triggerGadgets(Object obj) {
         if (obj == null) return;
+        // Always trigger toString/hashCode — fires Rome/ObjectBean/ToStringBean gadgets
+        try { obj.hashCode(); } catch (Throwable ignored) {}
+        try { obj.toString(); } catch (Throwable ignored) {}
         if (obj instanceof javax.swing.UIDefaults) {
             javax.swing.UIDefaults ud = (javax.swing.UIDefaults) obj;
             for (Object k : new java.util.ArrayList<>(ud.keySet())) {
@@ -151,6 +154,7 @@ public class VulnLabServer {
             for (Object k : new java.util.ArrayList<>(map.keySet())) {
                 try { k.hashCode(); } catch (Throwable ignored) {}
                 try { k.toString(); } catch (Throwable ignored) {}
+                triggerGadgets(k);  // UIDefaults/SignedObject may be nested as a MAP KEY
                 Object v = null;
                 try { v = map.get(k); } catch (Throwable ignored) {}
                 if (v != null) triggerGadgets(v);
@@ -158,7 +162,6 @@ public class VulnLabServer {
         }
         if (obj instanceof java.util.Collection) {
             for (Object item : (java.util.Collection<?>) obj) {
-                try { item.hashCode(); } catch (Throwable ignored) {}
                 triggerGadgets(item);
             }
         }

