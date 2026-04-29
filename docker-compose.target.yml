@@ -51,31 +51,27 @@ services:
       vuln: "Log4Shell CVE-2021-44228"
       payload: "log4shell_basic"
 
-  # ── Apache Shiro CVE-2016-4437 (AES-CBC RememberMe RCE) ──────────────────
-  shiro-cbc:
-    image: registry.cn-hangzhou.aliyuncs.com/vulhub/shiro:1.2.4
-    container_name: vuln-shiro-cbc
+  # ── Apache Shiro RememberMe RCE (self-written target, CC3.2.1+CB1.9.4) ────
+  # CVE-2016-4437 (AES-CBC) → POST /login    — port 8082
+  # CVE-2020-11989 (AES-GCM) → POST /login-gcm — same container, same port
+  shiro:
+    build:
+      context: ./shiro-app
+      dockerfile: Dockerfile
+    container_name: vuln-shiro
     restart: unless-stopped
     ports:
       - "8082:8080"
     networks:
       - vulnlab
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: "8080"
+      SHIRO_KEY: "kPH+bIxk5D2deZiIxcaaaA=="
     labels:
-      vuln: "Shiro CVE-2016-4437 AES-CBC"
-      payload: "shiro_cbc"
-
-  # ── Spring Boot + Shiro AES-GCM (CVE-2020-11989) ─────────────────────────
-  shiro-gcm:
-    image: registry.cn-hangzhou.aliyuncs.com/vulhub/shiro:1.6.0
-    container_name: vuln-shiro-gcm
-    restart: unless-stopped
-    ports:
-      - "8083:8080"
-    networks:
-      - vulnlab
-    labels:
-      vuln: "Shiro CVE-2020-11989 AES-GCM"
-      payload: "shiro_gcm"
+      vuln: "Shiro RememberMe RCE — CBC /login, GCM /login-gcm"
+      payload: "shiro_cbc shiro_gcm jchains_shiro_cbc"
 
   # ── Fastjson 1.2.47 RCE (CVE-2019-14439 / JNDI) ─────────────────────────
   fastjson:
