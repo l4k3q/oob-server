@@ -248,7 +248,9 @@ RUN chmod +x /usr/local/bin/busybox && \
     > /usr/local/bin/curl && chmod +x /usr/local/bin/curl
 WORKDIR /app
 COPY --from=build /app/target/deser-app-cc3-1.0.jar app.jar
-COPY --from=build /aih-patch/aih-patch.jar aih-patch.jar
+# Pre-compiled aih-patch.jar: AnnotationInvocationHandler with simplified readObject()
+# (no 8u71+ validation loop) compiled on Java 8 with bootclasspath to override rt.jar.
+COPY aih-patch.jar aih-patch.jar
 EXPOSE 8888
 ENV PORT=8888
 # -Xbootclasspath/p: prepend our patched AIH class before rt.jar so it takes
