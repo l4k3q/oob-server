@@ -34,6 +34,7 @@ public class VulnLabServer {
         server.createContext("/hessian2", new HessianHandler(true));
         server.createContext("/log4shell", new Log4ShellHandler());
         server.createContext("/h2jdbc",   new H2JdbcHandler());
+        server.createContext("/check-rce", new CheckRceHandler());
         server.createContext("/health",   new HealthHandler());
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
@@ -130,6 +131,39 @@ public class VulnLabServer {
         }
     }
 
+    // Trigger lazy gadget values that are only activated by explicit access.
+    // UIDefaults lazy values (SwingLazyValue/ProxyLazyValue) only fire on UIDefaults.get(key),
+    // NOT on toString(). SignedObject secondary deserialization fires on getObject() call.
+    // HashMap/TreeMap key chains fire on hashCode()/compareTo() during Map operations.
+    static void triggerGadgets(Object obj) {
+        if (obj == null) return;
+        if (obj instanceof javax.swing.UIDefaults) {
+            javax.swing.UIDefaults ud = (javax.swing.UIDefaults) obj;
+            for (Object k : new java.util.ArrayList<>(ud.keySet())) {
+                try { ud.get(k); } catch (Throwable ignored) {}
+            }
+        }
+        if (obj instanceof java.security.SignedObject) {
+            try { ((java.security.SignedObject) obj).getObject(); } catch (Throwable ignored) {}
+        }
+        if (obj instanceof java.util.Map) {
+            java.util.Map<?,?> map = (java.util.Map<?,?>) obj;
+            for (Object k : new java.util.ArrayList<>(map.keySet())) {
+                try { k.hashCode(); } catch (Throwable ignored) {}
+                try { k.toString(); } catch (Throwable ignored) {}
+                Object v = null;
+                try { v = map.get(k); } catch (Throwable ignored) {}
+                if (v != null) triggerGadgets(v);
+            }
+        }
+        if (obj instanceof java.util.Collection) {
+            for (Object item : (java.util.Collection<?>) obj) {
+                try { item.hashCode(); } catch (Throwable ignored) {}
+                triggerGadgets(item);
+            }
+        }
+    }
+
     static class HessianHandler implements HttpHandler {
         private final boolean hessian2;
         HessianHandler(boolean hessian2) { this.hessian2 = hessian2; }
@@ -164,6 +198,9 @@ public class VulnLabServer {
                     final javax.sql.ConnectionPoolDataSource cpds = (javax.sql.ConnectionPoolDataSource) obj;
                     new Thread(() -> { try { cpds.getPooledConnection(); } catch (Throwable ignored) {} }, "c3p0-trigger").start();
                 }
+                // Trigger lazy values (UIDefaults, SignedObject) that toString() doesn't activate
+                final Object triggerObj = obj;
+                new Thread(() -> triggerGadgets(triggerObj), "hessian-trigger").start();
                 respond(ex, 200, "OK: " + obj);
             } catch (Throwable t) {
                 System.out.println("[hessian] Exception: " + t.getMessage());
@@ -209,9 +246,29 @@ public class VulnLabServer {
         }
     }
 
+    static class CheckRceHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            String query = ex.getRequestURI().getQuery();
+            String prefix = (query != null && query.startsWith("f=")) ? query.substring(2) : "";
+            // List files in /tmp matching oobx_* prefix
+            java.io.File tmp = new java.io.File("/tmp");
+            java.io.File[] files = tmp.listFiles();
+            java.util.List<String> found = new java.util.ArrayList<>();
+            if (files != null) {
+                for (java.io.File f : files) {
+                    if (f.getName().startsWith("oobx_") &&
+                        (prefix.isEmpty() || f.getName().startsWith("oobx_" + prefix))) {
+                        found.add(f.getName());
+                    }
+                }
+            }
+            respond(ex, 200, "{\"rce_files\":" + found.toString().replace("[","[\"").replace("]","\"]").replace(", ","\",\"") + ",\"count\":" + found.size() + "}");
+        }
+    }
+
     static class HealthHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
-            respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\",\"/h2jdbc\"]}");
+            respond(ex, 200, "{\"status\":\"ok\",\"endpoints\":[\"/deser\",\"/fastjson\",\"/xstream\",\"/hessian\",\"/hessian2\",\"/log4shell\",\"/h2jdbc\",\"/check-rce\"]}");
         }
     }
 }

@@ -32,7 +32,8 @@ public class FastjsonChainHandler implements ChainHandler {
             case "jchains_fastjson", "fastjson_jdbcrowset"  -> jdbcRowSetJson(jndiUrl);
             case "fastjson_jdbcrowset_v2"                   -> jdbcRowSetV2Json(jndiUrl);
             // BCEL: delegate class generation to CustomBytecodeHandler (Javassist), then BCEL-encode
-            case "fastjson_bcel"                            -> bcelJson(bcelDriverClassName(cmd, params));
+            // jchains_fastjson_bcel also routed here — java-chains generates non-@type format
+            case "fastjson_bcel", "jchains_fastjson_bcel"   -> bcelJson(bcelDriverClassName(cmd, params));
             default -> throw new IllegalArgumentException("Unknown Fastjson chain: " + chainId);
         };
 

@@ -437,7 +437,7 @@ public class JavaChainsProxyHandler implements ChainHandler {
                 return new PayloadResult("application/octet-stream", new byte[0],
                     Map.of("error", "cmd required for exec chain: " + chainId));
             }
-            jcParams = Map.of("command", cmd);
+            jcParams = Map.of("cmd", cmd, "needAbstractTranslet", "true");
         }
 
         byte[] bytes = callParse(def, jcParams);

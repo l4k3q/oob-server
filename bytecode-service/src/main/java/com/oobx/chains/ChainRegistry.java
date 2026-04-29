@@ -94,6 +94,12 @@ public class ChainRegistry {
         // Requires java-chains running at javachains.url (default :8011) with CHAINS_AUTH=false
         javaChains.chainIds().forEach(id -> handlers.put(id, javaChains));
 
+        // Overrides: some jchains_* IDs are better served by local handlers
+        // jchains_shiro_cbc: java-chains ShiroPayload has encode issues; use ShiroChainHandler with CB1
+        handlers.put("jchains_shiro_cbc", shiroCombined);
+        // jchains_fastjson_bcel: java-chains generates non-@type format; use FastjsonChainHandler directly
+        handlers.put("jchains_fastjson_bcel", fastjson);
+
         // ── CC6+TemplatesImpl bytecode wrap (no subprocess, pure in-process) ─
         handlers.put("serialize_bytecode_cc6", bytecodeSerialize);
     }
