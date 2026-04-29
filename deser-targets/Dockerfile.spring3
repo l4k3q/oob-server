@@ -6,7 +6,7 @@ COPY DeserApp.java .
 RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
 
 FROM openjdk:8-jre-slim
-RUN apt-get update -q && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -q && apt-get install -y --no-install-recommends curl wget ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/target/deser-app-spring3-1.0.jar app.jar
 EXPOSE 8888

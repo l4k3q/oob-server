@@ -154,6 +154,40 @@
 
     <!-- Commons BeanUtils 1.8.3 — NOT replacing 1.9.4, both coexist for CB2 chain testing -->
     <!-- Note: ysoserial CB2 requires serialVersionUID from 1.8.x; kept here for completeness -->
+
+    <!-- Tomcat EL engine — required for jchains_native_c3p0_el, jchains_jndi_tomcat_el,
+         and enables org.apache.naming.factory.BeanFactory for JNDI Reference RCE chains -->
+    <dependency>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-el</artifactId>
+      <version>9.0.65</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.tomcat</groupId>
+      <artifactId>tomcat-catalina</artifactId>
+      <version>9.0.65</version>
+    </dependency>
+
+    <!-- XBean Reflect — required for jchains_hessian2_tostring_xbean -->
+    <dependency>
+      <groupId>org.apache.xbean</groupId>
+      <artifactId>xbean-reflect</artifactId>
+      <version>4.23</version>
+    </dependency>
+
+    <!-- BeanShell — required for jchains_jndi_beanshell JNDI Reference RCE -->
+    <dependency>
+      <groupId>org.beanshell</groupId>
+      <artifactId>bsh</artifactId>
+      <version>2.0b4</version>
+    </dependency>
+
+    <!-- SnakeYAML — required for jchains_jndi_snakeyaml -->
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+      <version>1.30</version>
+    </dependency>
   </dependencies>
 
   <build>

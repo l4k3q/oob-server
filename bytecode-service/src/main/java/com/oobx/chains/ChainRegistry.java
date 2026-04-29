@@ -99,6 +99,8 @@ public class ChainRegistry {
         handlers.put("jchains_shiro_cbc", shiroCombined);
         // jchains_fastjson_bcel: java-chains generates non-@type format; use FastjsonChainHandler directly
         handlers.put("jchains_fastjson_bcel", fastjson);
+        // jchains_fastjson_c3p0_h2: java-chains H2JavaJdbc1 returns empty; use local implementation
+        handlers.put("jchains_fastjson_c3p0_h2", fastjson);
 
         // ── CC6+TemplatesImpl bytecode wrap (no subprocess, pure in-process) ─
         handlers.put("serialize_bytecode_cc6", bytecodeSerialize);

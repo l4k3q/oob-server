@@ -25,6 +25,10 @@ public class VulnLabServer {
     private static final Logger log = LogManager.getLogger(VulnLabServer.class);
 
     public static void main(String[] args) throws Exception {
+        // Enable JNDI remote class loading for JNDI RCE chains
+        System.setProperty("com.sun.jndi.ldap.object.trustURLCodebase", "true");
+        System.setProperty("com.sun.jndi.rmi.object.trustURLCodebase", "true");
+        System.setProperty("com.sun.jndi.ldap.object.trustSerialData", "true");
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 8888;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/deser",    new DeserHandler());
@@ -103,6 +107,14 @@ public class VulnLabServer {
             System.out.println("[fastjson] Received: " + json.substring(0, Math.min(json.length(), 200)));
             try {
                 Object obj = com.alibaba.fastjson.JSON.parseObject(json);
+                // Trigger C3P0 connection pool to execute H2 INIT script (fastjson_c3p0_h2 chain)
+                if (obj instanceof javax.sql.DataSource) {
+                    final javax.sql.DataSource ds = (javax.sql.DataSource) obj;
+                    new Thread(() -> { try { ds.getConnection(); } catch (Throwable ignored) {} }, "fastjson-c3p0").start();
+                } else if (obj instanceof javax.sql.ConnectionPoolDataSource) {
+                    final javax.sql.ConnectionPoolDataSource cpds = (javax.sql.ConnectionPoolDataSource) obj;
+                    new Thread(() -> { try { cpds.getPooledConnection(); } catch (Throwable ignored) {} }, "fastjson-c3p0").start();
+                }
                 respond(ex, 200, "OK: " + obj);
             } catch (Throwable t) {
                 System.out.println("[fastjson] Exception: " + t.getMessage());

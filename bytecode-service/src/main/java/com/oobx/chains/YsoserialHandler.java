@@ -26,6 +26,9 @@ public class YsoserialHandler implements ChainHandler {
     @Value("${ysoserial.java:}")
     private String configuredJava;
 
+    @Value("${ysoserial.java7:}")
+    private String configuredJava7;
+
     public static final List<String> SUPPORTED_CHAINS = List.of(
             "CommonsCollections1","CommonsCollections2","CommonsCollections3",
             "CommonsCollections4","CommonsCollections5","CommonsCollections6","CommonsCollections7",
@@ -61,7 +64,9 @@ public class YsoserialHandler implements ChainHandler {
         String url = (String) params.getOrDefault("url", cmd);
         String arg = chain.equals("URLDNS") ? (url.isEmpty() ? cmd : url) : (cmd.isEmpty() ? url : cmd);
 
-        byte[] bytes = invokeYsoserial(chain, arg, resolveJavaExe());
+        // jdk7u21 requires Java 7 JVM: AnnotationInvocationHandler serialVersionUID differs between Java 7 and 8+
+        String javaExe = chain.equals("Jdk7u21") ? resolveJava7Exe() : resolveJavaExe();
+        byte[] bytes = invokeYsoserial(chain, arg, javaExe);
         if (bytes.length == 0) {
             return new PayloadResult("application/octet-stream", bytes,
                     Map.of("error", "ysoserial returned empty",
@@ -94,6 +99,29 @@ public class YsoserialHandler implements ChainHandler {
         }
         // 3. Fallback to current JVM (may fail for some chains on Java 9+)
         return ProcessHandle.current().info().command().orElse("java");
+    }
+
+    private String resolveJava7Exe() {
+        // 1. Explicitly configured path (from env YSOSERIAL_JAVA_7)
+        if (configuredJava7 != null && !configuredJava7.isBlank()) {
+            return configuredJava7;
+        }
+        // 2. Auto-detect Zulu 7 / OpenJDK 7 on common paths
+        String[] candidates = {
+            "/opt/zulu7/bin/java",
+            "/usr/lib/jvm/java-7-openjdk-amd64/bin/java",
+            "/usr/lib/jvm/zulu-7-amd64/bin/java",
+            "C:\\Program Files\\Java\\jdk1.7.0_80\\bin\\java.exe",
+        };
+        for (String path : candidates) {
+            if (new java.io.File(path).exists()) {
+                log.info("Using Java 7 for ysoserial Jdk7u21: " + path);
+                return path;
+            }
+        }
+        // 3. Fallback to Java 8 (will produce wrong sUID but better than nothing)
+        log.warning("Java 7 not found for Jdk7u21 chain — falling back to Java 8 (sUID may mismatch)");
+        return resolveJavaExe();
     }
 
     /**
