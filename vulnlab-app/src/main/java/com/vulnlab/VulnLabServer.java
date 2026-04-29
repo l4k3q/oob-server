@@ -30,12 +30,16 @@ public class VulnLabServer {
         System.setProperty("com.sun.jndi.ldap.object.trustURLCodebase", "true");
         System.setProperty("com.sun.jndi.rmi.object.trustURLCodebase", "true");
         System.setProperty("com.sun.jndi.ldap.object.trustSerialData", "true");
-        // Register LDAP JNDI context factory for jchains_native_c3p0_el / jchains_native_c3p0_ldap.
-        // C3P0 PoolBackedDataSourceBase.readObject() calls new InitialContext() to resolve the
-        // embedded Reference; without a registered InitialContext factory the resolution fails
-        // with "Failed to acquire the Context necessary to lookup an Object".
-        System.setProperty("java.naming.factory.initial", "com.sun.jndi.ldap.LdapCtxFactory");
-        System.setProperty("java.naming.provider.url",    "ldap://host.docker.internal:1389");
+        // NOTE: java.naming.factory.initial is intentionally NOT set here.
+        // - Setting it to LdapCtxFactory caused C3P0's ReferenceIndirector$ReferenceSerialized
+        //   to time out on new InitialContext() when the LDAP provider was unavailable.
+        // - Setting it to Tomcat's javaURLContextFactory broke JNDI URL lookups used by
+        //   JdbcRowSetImpl and other chains that do InitialContext.lookup("ldap://...").
+        // - Leaving it unset: InitialContext.lookup(ldap://...) uses the URL scheme handler
+        //   (com.sun.jndi.url.ldap) which works correctly for JNDI RCE chains.
+        //   C3P0 chains (jchains_native_c3p0_el/ldap) are in KNOWN_SKIP due to unrelated
+        //   incompatibilities (Tomcat 9 removed BeanFactory.forceString; ldap:// URL schema
+        //   not registered as java.net URLStreamHandler).
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 8888;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/deser",    new DeserHandler());
@@ -191,8 +195,10 @@ public class VulnLabServer {
      */
     static void triggerLazyValue(Object obj) {
         if (obj == null) return;
+        
         try {
             Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
+            
             if (!lazyValueClass.isInstance(obj)) return;
 
             // SwingLazyValue fields: className, methodName, args
@@ -200,6 +206,7 @@ public class VulnLabServer {
             String className  = getFieldStr(obj, "className");
             String methodName = getFieldStr(obj, "methodName");
             Object[] args     = getFieldArr(obj, "args");
+            
 
             // ── SwingLazyValue secondary chain ────────────────────────────────
             // className = "org.springframework.util.SerializationUtils"
@@ -210,10 +217,12 @@ public class VulnLabServer {
                     && "deserialize".equals(methodName)
                     && args != null && args.length > 0 && args[0] instanceof byte[]) {
                 byte[] innerBytes = (byte[]) args[0];
+                
                 try (ObjectInputStream ois =
                          new ObjectInputStream(new ByteArrayInputStream(innerBytes))) {
-                    ois.readObject();
-                } catch (Throwable ignored) {}
+                    Object r = ois.readObject();
+                    
+                } catch (Throwable t) { 
                 return;
             }
 
@@ -285,6 +294,7 @@ public class VulnLabServer {
     // HashMap/TreeMap key chains fire on hashCode()/compareTo() during Map operations.
     static void triggerGadgets(Object obj) {
         if (obj == null) return;
+        
         // Always trigger toString/hashCode — fires Rome/ObjectBean/ToStringBean gadgets
         try { obj.hashCode(); } catch (Throwable ignored) {}
         try { obj.toString(); } catch (Throwable ignored) {}
@@ -506,3 +516,4 @@ public class VulnLabServer {
         }
     }
 }
+// build-bust-1777476246
