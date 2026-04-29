@@ -3,12 +3,15 @@ WORKDIR /app
 COPY pom-cc3.xml pom.xml
 RUN mvn -q dependency:go-offline
 COPY DeserApp.java .
-RUN mkdir -p src/main/java/com/vulnlab/deser && cp DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
+RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
 
-# Java 8u65 — before JEP 290 (8u121), before cc1/cc3 patch (8u232)
+# Java 8u102 — before JEP 290 (8u121), before cc1/cc3 patch (8u232)
 # Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_jrmp_client
-FROM frekele/java:8u65-jdk
-RUN apt-get update -q && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# frekele:8u65, adoptopenjdk:8u65, azul:8u65, bellsoft:8u65 all use old Docker v1 manifests
+# incompatible with containerd v2.1. Use azul/zulu-openjdk:8u102 instead (still pre-patch).
+FROM azul/zulu-openjdk:8u102
+# Old base image has stale apt repos; skip apt and copy static curl binary
+COPY --from=curlimages/curl:latest /usr/bin/curl /usr/bin/curl
 WORKDIR /app
 COPY --from=build /app/target/deser-app-cc3-1.0.jar app.jar
 EXPOSE 8888

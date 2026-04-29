@@ -3,7 +3,7 @@ WORKDIR /app
 COPY pom-jdk17.xml pom.xml
 RUN mvn -q dependency:go-offline
 COPY DeserApp.java .
-RUN mkdir -p src/main/java/com/vulnlab/deser && cp DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
+RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
 
 FROM eclipse-temurin:17-jdk-jammy
 RUN apt-get update -q && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
