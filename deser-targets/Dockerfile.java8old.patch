@@ -1,0 +1,9 @@
+# Patch-only Dockerfile: adds busybox curl/wget onto existing java8-old image
+# Avoids Maven rebuild (which fails due to Docker Desktop network issues with old repos)
+FROM busybox:1.36.1-uclibc AS busybox
+FROM oobserver-next-java8-old:base
+COPY --from=busybox /bin/busybox /usr/local/bin/busybox
+RUN chmod +x /usr/local/bin/busybox && \
+    ln -sf /usr/local/bin/busybox /usr/local/bin/wget && \
+    printf '#!/bin/sh\nOUT=/dev/null; URL=""; NOUT=0\nfor a in "$@"; do\n  if [ "$NOUT" = "1" ]; then OUT="$a"; NOUT=0\n  elif [ "$a" = "-o" ]; then NOUT=1\n  elif [ "${a#-}" = "$a" ]; then URL="$a"\n  fi\ndone\nexec /usr/local/bin/busybox wget -q -O "$OUT" "$URL"\n' \
+    > /usr/local/bin/curl && chmod +x /usr/local/bin/curl

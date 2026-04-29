@@ -169,6 +169,13 @@
       <version>9.0.65</version>
     </dependency>
 
+    <!-- tomcat-catalina — provides org.apache.naming.ResourceRef for C3P0 EL/LDAP chains -->
+    <dependency>
+      <groupId>org.apache.tomcat</groupId>
+      <artifactId>tomcat-catalina</artifactId>
+      <version>9.0.65</version>
+    </dependency>
+
     <!-- XBean Reflect — required for jchains_hessian2_tostring_xbean -->
     <dependency>
       <groupId>org.apache.xbean</groupId>

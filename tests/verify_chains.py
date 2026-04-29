@@ -996,7 +996,8 @@ def main():
 
     # ── Section 1: ysoserial chains (vulnlab — CC3/CC4/CB1 all on classpath) ───
     print("\n[*] Section 1a: ysoserial chains → vulnlab :8888")
-    for cid in ["ysoserial_cc2","ysoserial_cc4","ysoserial_cc5","ysoserial_cc6","ysoserial_cc7",
+    # cc2/cc4 moved to java8-old (TemplatesImpl patched in JDK 8u191+)
+    for cid in ["ysoserial_cc5","ysoserial_cc6","ysoserial_cc7",
                 "ysoserial_cb1","cb_no_cc","ysoserial_rome",
                 "ysoserial_hibernate1"]:
         test_deser_chain(cid)
@@ -1040,13 +1041,19 @@ def main():
     print("\n[*] Section 2a: jchains native chains → vulnlab :8888")
     for cid in ["jchains_native_cc6","jchains_native_cb1",
                 "jchains_native_k1_secondary",
-                "jchains_cc1","jchains_cc2","jchains_cc3","jchains_cc4","jchains_cc6",
+                "jchains_cc1","jchains_cc3","jchains_cc6",
                 "jchains_native_jackson",
-                "jchains_native_c3p0_el"]:  # tomcat-embed-el now on classpath
+                "jchains_native_c3p0_el"]:  # tomcat-catalina on classpath for ResourceRef
         test_deser_chain(cid)
     # CB1 JNDI and C3P0 LDAP need jndi_url param (not cmd)
     test_deser_jndi_chain("jchains_native_cb1_jndi")
     test_deser_jndi_chain("jchains_native_c3p0_ldap")  # LDAP provider available in Java 8 JDK
+    # CC2/CC4 use TemplatesImpl which is patched in JDK 8u191+ — test on java8-old (8u102)
+    for cid in ["ysoserial_cc2","ysoserial_cc4","jchains_cc2","jchains_cc4"]:
+        if j8old_ok:
+            test_deser_chain(cid, target_url=JAVA8OLD_URL, container_name="vuln-java8old")
+        else:
+            record(cid, "SKIP", "java8-old not running (TemplatesImpl patched in JDK 8u191+)")
 
     print("\n[*] Section 2b: jchains jdk17 chains → java17 :8893")
     for cid in ["jchains_native_jdk17_1","jchains_native_jdk17_2"]:
