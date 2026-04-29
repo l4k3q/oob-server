@@ -5,7 +5,7 @@ RUN mvn dependency:go-offline -q
 COPY src ./src
 RUN mvn package -DskipTests -q
 
-FROM eclipse-temurin:8-jre-jammy
+FROM eclipse-temurin:8-jdk-jammy
 RUN apt-get update -qq && apt-get install -y --no-install-recommends curl wget ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /build/target/vulnlab-app-1.0.jar vulnlab.jar
