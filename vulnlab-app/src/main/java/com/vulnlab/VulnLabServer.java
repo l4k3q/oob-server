@@ -217,12 +217,10 @@ public class VulnLabServer {
                     && "deserialize".equals(methodName)
                     && args != null && args.length > 0 && args[0] instanceof byte[]) {
                 byte[] innerBytes = (byte[]) args[0];
-                
                 try (ObjectInputStream ois =
                          new ObjectInputStream(new ByteArrayInputStream(innerBytes))) {
-                    Object r = ois.readObject();
-                    
-                } catch (Throwable t) { 
+                    ois.readObject();
+                } catch (Throwable ignored) {}
                 return;
             }
 
@@ -230,7 +228,8 @@ public class VulnLabServer {
             // className = "com.sun.org.apache.bcel.internal.util.JavaWrapper"
             // methodName = "_main", args[0] = Object[]{"$$BCEL$$..."} (Hessian downcasts String[])
             // ProxyLazyValue.getClassArray() sees Object[] → looks for _main(Object[]), fails.
-            // Directly call JavaWrapper._main(String[]{bcelClass}) with correct type.
+            // Fix: extract the $$BCEL$$ class string from args and load it via Apache BCEL
+            // (standalone org.apache.bcel.util.ClassLoader on classpath) or JDK internal BCEL.
             if ("com.sun.org.apache.bcel.internal.util.JavaWrapper".equals(className)
                     && "_main".equals(methodName)
                     && args != null && args.length > 0) {
@@ -244,12 +243,32 @@ public class VulnLabServer {
                         bcelClass = (String) innerArr[0];
                 }
                 if (bcelClass != null && bcelClass.startsWith("$$BCEL$$")) {
+                    // Strategy 1: use JDK internal BCEL JavaWrapper._main
                     try {
                         Class<?> jw = Class.forName("com.sun.org.apache.bcel.internal.util.JavaWrapper",
                                 true, Thread.currentThread().getContextClassLoader());
                         java.lang.reflect.Method m = jw.getDeclaredMethod("_main", String[].class);
+                        m.setAccessible(true);
                         m.invoke(null, (Object) new String[]{bcelClass});
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable t1) {
+                        // Strategy 2: load via JDK internal BCEL ClassLoader directly (triggers <clinit>)
+                        try {
+                            Class<?> bcelCLClass = Class.forName(
+                                "com.sun.org.apache.bcel.internal.util.ClassLoader",
+                                true, Thread.currentThread().getContextClassLoader());
+                            ClassLoader bcelLoader = (ClassLoader) bcelCLClass.getConstructor().newInstance();
+                            Class.forName(bcelClass, true, bcelLoader);  // <clinit> fires here
+                        } catch (Throwable t2) {
+                            // Strategy 3: load via Apache BCEL standalone ClassLoader (org.apache.bcel)
+                            try {
+                                Class<?> apacheBcelCLClass = Class.forName(
+                                    "org.apache.bcel.util.ClassLoader",
+                                    true, Thread.currentThread().getContextClassLoader());
+                                ClassLoader apacheLoader = (ClassLoader) apacheBcelCLClass.getConstructor().newInstance();
+                                Class.forName(bcelClass, true, apacheLoader);  // <clinit> fires here
+                            } catch (Throwable ignored) {}
+                        }
+                    }
                 }
                 return;
             }
@@ -368,18 +387,43 @@ public class VulnLabServer {
         // For Hessian2 endpoints: also try Hessian1 as final fallback because some payloads
         // (e.g. Hessian2ToStringPayload XBean chain) encode objects using Hessian1 wire format
         // even when the endpoint is /hessian2 (java-chains implementation detail).
+        //
+        // XBean chain note: Hessian2ToStringPayload generates a Hessian2 object stream
+        // that starts with 'C' (0x43 = class definition). Hessian 4.0.66 Hessian2Input
+        // readObject() does not handle 'C' at top level (throws "unknown code 0x43").
+        // We detect this case and use Hessian2Input with explicit class-def-aware parsing
+        // by wrapping the class-def in a try-skip loop.
         private Object deserHessian(byte[] body) throws Exception {
+            // If payload starts with 'C' (0x43, Hessian2 class definition), skip the RPC frame
+            // attempt and go straight to Hessian2 readObject(Class) which handles 'C' defs.
+            // Note: Hessian2Input.readObject() (no-arg) does NOT handle 'C' at the top level
+            // (its switch table maps 0x43 to the error default); only readObject(Class) does
+            // (its switch table explicitly handles case 67→readObjectDefinition+readObject).
+            // Calling readObject(HashMap.class) triggers the class-aware switch.
+            boolean startsWithClassDef = body.length > 0 && body[0] == 'C';
+            if (!startsWithClassDef) {
+                try {
+                    com.caucho.hessian.io.AbstractHessianInput rpc = newInput(body);
+                    rpc.readMethod();
+                    return rpc.readObject();
+                } catch (Throwable ignored) {}
+            }
+            // For Hessian2: try readObject(HashMap.class) which handles 'C' class definitions
+            // at the top level. Falls back to readObject() for non-class-def payloads.
             try {
-                com.caucho.hessian.io.AbstractHessianInput rpc = newInput(body);
-                rpc.readMethod();
-                return rpc.readObject();
-            } catch (Throwable ignored) {}
-            try {
-                return newInput(body).readObject();
+                com.caucho.hessian.io.AbstractHessianInput h = newInput(body);
+                if (h instanceof com.caucho.hessian.io.Hessian2Input) {
+                    return ((com.caucho.hessian.io.Hessian2Input) h).readObject(java.util.HashMap.class);
+                }
+                return h.readObject();
             } catch (Throwable t2) {
                 if (!hessian2) throw t2 instanceof Exception ? (Exception) t2 : new Exception(t2);
             }
-            // Hessian2 endpoint fallback: try Hessian1 (covers XBean/WritableContext toString chains)
+            // Hessian2 fallback: plain readObject() (for non-class-def Hessian2 payloads)
+            try {
+                return newInput(body).readObject();
+            } catch (Throwable ignored) {}
+            // Final fallback: try Hessian1 (some java-chains payloads use Hessian1 wire format)
             try {
                 com.caucho.hessian.io.HessianInput h1rpc = new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
                 h1rpc.readMethod();

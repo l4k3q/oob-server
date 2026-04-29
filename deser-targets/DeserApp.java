@@ -77,11 +77,23 @@ public class DeserApp {
             while ((n = body.read(buf)) != -1) baos.write(buf, 0, n);
             byte[] data = baos.toByteArray();
             System.out.println("[hessian" + (hessian2?"2":"") + "] Received " + data.length + " bytes");
+            Object result = null;
             try {
-                Object result = deserializeHessian(data, hessian2);
+                result = deserializeHessian(data, hessian2);
                 System.out.println("[hessian" + (hessian2?"2":"") + "] OK: " + result);
+            } catch (java.lang.reflect.InvocationTargetException ite) {
+                // InvocationTargetException wraps exception from Spring/Hessian chain.
+                // The exec may have already been launched (async) — log cause and wait for it.
+                Throwable cause = ite.getCause() != null ? ite.getCause() : ite;
+                System.out.println("[hessian" + (hessian2?"2":"") + "] InvocationTargetException cause: " + cause);
+                // Give async subprocess time to complete the OOB callback
+                try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
             } catch (Throwable t) {
-                System.out.println("[hessian" + (hessian2?"2":"") + "] Error: " + t);
+                System.out.println("[hessian" + (hessian2?"2":"") + "] Error: " + t.getClass().getName() + ": " + t.getMessage());
+            }
+            // Call toString() on result if available — fires SpringExec/SignedObject chains
+            if (result != null) {
+                try { result.toString(); } catch (Throwable ignored) {}
             }
             byte[] resp = "OK".getBytes();
             ex.sendResponseHeaders(200, resp.length);
@@ -90,7 +102,8 @@ public class DeserApp {
         }
 
         private Object deserializeHessian(byte[] data, boolean h2) throws Exception {
-            // Try Hessian RPC frame (method call + args) first, then raw object
+            // Try Hessian RPC frame (method call + args) first, then raw object.
+            // Uses reflection to avoid compile failure when Hessian jar is not on classpath.
             Class<?> h2InputClass = Class.forName(h2
                 ? "com.caucho.hessian.io.Hessian2Input"
                 : "com.caucho.hessian.io.HessianInput");

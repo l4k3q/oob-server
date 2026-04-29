@@ -165,8 +165,10 @@ services:
       vuln: "Java native deserialization (CC6)"
       payload: "ysoserial_cc6"
 
-  # ── Java 8u65 target (before JEP290 + before cc1/cc3 patch) ─────────────
-  # Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_jrmp_client
+  # ── Java 8u102 target (pre-JEP290 + AIH bootstrap-patched for cc1/cc3) ──────
+  # Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_cc2, ysoserial_cc4, ysoserial_jrmp_client
+  # Runtime: azul/zulu-openjdk:8u102 with -Xbootclasspath/p:aih-patch.jar to bypass the
+  # 8u71 AnnotationInvocationHandler.readObject() security check for CC1/CC3.
   java8-old:
     build:
       context: ./deser-targets
@@ -180,8 +182,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     labels:
-      vuln: "Java 8u65 deser — before JEP290/cc1-patch"
-      payload: "ysoserial_cc1 ysoserial_cc3 ysoserial_jrmp_client"
+      vuln: "Java 8u102 deser — pre-JEP290 + AIH-patched for CC1/CC3"
+      payload: "ysoserial_cc1 ysoserial_cc3 ysoserial_cc2 ysoserial_cc4 ysoserial_jrmp_client"
 
   # ── Java 7 target (jdk7u21 gadget chain) ─────────────────────────────────
   java7:
