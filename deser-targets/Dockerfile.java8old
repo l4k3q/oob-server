@@ -1,11 +1,11 @@
-FROM busybox:1.36 AS busybox
+FROM busybox:1.36.1-uclibc AS busybox
 
 FROM maven:3.8-openjdk-8 AS build
 WORKDIR /app
 COPY pom-cc3.xml pom.xml
-RUN mvn -q dependency:go-offline
+RUN mvn -q --no-transfer-progress dependency:resolve dependency:resolve-plugins
 COPY DeserApp.java .
-RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
+RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q --offline package -DskipTests
 
 # Java 8u102 — before JEP 290 (8u121), before cc1/cc3 patch (8u232)
 # Covers: ysoserial_cc1, ysoserial_cc3, ysoserial_jrmp_client, ysoserial_groovy1
