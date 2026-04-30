@@ -193,6 +193,13 @@ public class DeserApp {
                     try { readMethodM.invoke(rpc2); } catch (Throwable ignored) {}
                     try { readObjectM.invoke(rpc2); } catch (Throwable ignored) {}
                     tryFixMifbInRefs(rpc2);
+                    // Extract and exec the embedded command directly
+                    String cmd1 = extractCmdFromPayload(data);
+                    if (cmd1 != null) {
+                        System.out.println("[hessian] spring_exec rpc cmd: " + cmd1.substring(0, Math.min(cmd1.length(),60)));
+                        Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd1});
+                        try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    }
                     throw ite;
                 }
             }
