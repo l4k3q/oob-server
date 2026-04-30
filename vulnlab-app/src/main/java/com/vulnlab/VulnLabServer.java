@@ -418,62 +418,60 @@ public class VulnLabServer {
         // readObject(Class) DOES handle 'C' (case 67 → readObjectDefinition + readObject).
         // Fix: after RPC readMethod(), call readObject(HashMap.class) instead of readObject().
         private Object deserHessian(byte[] body) throws Exception {
+            String ep = hessian2 ? "hessian2" : "hessian";
             // If payload starts with 'C' (0x43, Hessian2 class definition at top level),
             // skip the RPC frame attempt — go straight to readObject(HashMap.class).
             boolean startsWithClassDef = body.length > 0 && body[0] == 'C';
 
             if (!startsWithClassDef) {
                 // Strategy 1: RPC frame — readMethod() + readObject(HashMap.class)
-                // readObject(HashMap.class) handles 'C' class definitions that appear after
-                // the RPC method header (XBean chain: RPC header + 'C' object definition).
                 if (hessian2) {
                     try {
                         com.caucho.hessian.io.Hessian2Input rpc =
                             (com.caucho.hessian.io.Hessian2Input) newInput(body);
                         rpc.readMethod();
                         return rpc.readObject(java.util.HashMap.class);
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable t) { System.out.println("[" + ep + "] S1 fail: " + t); }
                 }
                 // Strategy 2: RPC frame — readMethod() + plain readObject()
                 try {
                     com.caucho.hessian.io.AbstractHessianInput rpc = newInput(body);
                     rpc.readMethod();
                     return rpc.readObject();
-                } catch (Throwable ignored) {}
+                } catch (Throwable t) { System.out.println("[" + ep + "] S2 fail: " + t); }
             }
 
             // Strategy 3: Hessian2 readObject(HashMap.class) — handles 'C' at top level
-            // or 'C' immediately after skipping any leading frame bytes.
             if (hessian2) {
                 try {
                     com.caucho.hessian.io.Hessian2Input h2 =
                         (com.caucho.hessian.io.Hessian2Input) newInput(body);
                     return h2.readObject(java.util.HashMap.class);
-                } catch (Throwable ignored) {}
+                } catch (Throwable t) { System.out.println("[" + ep + "] S3 fail: " + t); }
             }
 
             // Strategy 4: plain readObject()
             try {
                 return newInput(body).readObject();
             } catch (Throwable t4) {
+                System.out.println("[" + ep + "] S4 fail: " + t4);
                 if (!hessian2) throw t4 instanceof Exception ? (Exception) t4 : new Exception(t4);
             }
 
-            // Hessian2-only fallbacks: try Hessian1 wire format (some java-chains payloads)
+            // Hessian2-only fallbacks: try Hessian1 wire format
             try {
                 com.caucho.hessian.io.HessianInput h1rpc =
                     new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
                 h1rpc.readMethod();
                 return h1rpc.readObject();
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) { System.out.println("[" + ep + "] S5 fail: " + t); }
             try {
                 com.caucho.hessian.io.HessianInput h1 =
                     new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
                 return h1.readObject();
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) { System.out.println("[" + ep + "] S6 fail: " + t); }
 
-            // Hessian2 XBean/ToStringPayload: try allowNonSerializable SerializerFactory
-            // with RPC frame (readMethod) + readObject(Object.class)
+            // Strategy 7: allowNonSerializable + RPC + readObject(Object.class)
             try {
                 com.caucho.hessian.io.Hessian2Input h2rpc =
                     (com.caucho.hessian.io.Hessian2Input) newInput(body);
@@ -482,9 +480,9 @@ public class VulnLabServer {
                 h2rpc.setSerializerFactory(sf);
                 h2rpc.readMethod();
                 return h2rpc.readObject(Object.class);
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) { System.out.println("[" + ep + "] S7 fail: " + t); }
 
-            // Hessian2 XBean/ToStringPayload: allowNonSerializable + readObject(Object.class) no RPC frame
+            // Strategy 8: allowNonSerializable + readObject(Object.class)
             try {
                 com.caucho.hessian.io.Hessian2Input h2 =
                     new com.caucho.hessian.io.Hessian2Input(new ByteArrayInputStream(body));
@@ -492,7 +490,7 @@ public class VulnLabServer {
                 sf.setAllowNonSerializable(true);
                 h2.setSerializerFactory(sf);
                 return h2.readObject(Object.class);
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) { System.out.println("[" + ep + "] S8 fail: " + t); }
 
             throw new Exception("deserHessian: all strategies exhausted for " + body.length + "-byte payload");
         }

@@ -19,6 +19,7 @@ RUN chmod +x /usr/local/bin/busybox && \
     > /usr/local/bin/curl && chmod +x /usr/local/bin/curl
 WORKDIR /app
 COPY --from=build /app/target/deser-app-spring3-1.0.jar app.jar
+COPY hessian.jar hessian.jar
 EXPOSE 8888
 ENV PORT=8888
-CMD ["java", "-jar", "app.jar"]
+CMD ["java", "-cp", "/app/app.jar:/app/hessian.jar", "com.vulnlab.deser.DeserApp"]
