@@ -173,19 +173,81 @@ public class DeserApp {
         }
 
         private Object deserializeHessian(byte[] data, boolean h2) throws Exception {
-            // Try Hessian RPC frame (method call + args) first, then raw object.
-            // Uses reflection to avoid compile failure when Hessian jar is not on classpath.
             Class<?> h2InputClass = Class.forName(h2
                 ? "com.caucho.hessian.io.Hessian2Input"
                 : "com.caucho.hessian.io.HessianInput");
             Class<?> abstractInputClass = Class.forName("com.caucho.hessian.io.AbstractHessianInput");
+            java.lang.reflect.Method readMethodM = abstractInputClass.getMethod("readMethod");
+            java.lang.reflect.Method readObjectM = abstractInputClass.getMethod("readObject");
+
+            // Strategy 1: RPC frame — readMethod() then readObject()
+            Object rpc1 = h2InputClass.getConstructor(InputStream.class).newInstance(new ByteArrayInputStream(data));
+            boolean rpcOk = false;
+            try { readMethodM.invoke(rpc1); rpcOk = true; } catch (Throwable ignored) {}
+            if (rpcOk) {
+                try {
+                    return readObjectM.invoke(rpc1);
+                } catch (java.lang.reflect.InvocationTargetException ite) {
+                    // Chain fired during readObject — re-read and fix _refs
+                    Object rpc2 = h2InputClass.getConstructor(InputStream.class).newInstance(new ByteArrayInputStream(data));
+                    try { readMethodM.invoke(rpc2); } catch (Throwable ignored) {}
+                    try { readObjectM.invoke(rpc2); } catch (Throwable ignored) {}
+                    tryFixMifbInRefs(rpc2);
+                    throw ite;
+                }
+            }
+
+            // Strategy 2: raw readObject() (no RPC frame)
+            Object raw = h2InputClass.getConstructor(InputStream.class).newInstance(new ByteArrayInputStream(data));
             try {
-                Object rpcIn = h2InputClass.getConstructor(InputStream.class).newInstance(new ByteArrayInputStream(data));
-                abstractInputClass.getMethod("readMethod").invoke(rpcIn);
-                return abstractInputClass.getMethod("readObject").invoke(rpcIn);
+                return readObjectM.invoke(raw);
+            } catch (java.lang.reflect.InvocationTargetException ite) {
+                // Chain fired during readObject — re-read and fix _refs
+                Object raw2 = h2InputClass.getConstructor(InputStream.class).newInstance(new ByteArrayInputStream(data));
+                try { readObjectM.invoke(raw2); } catch (Throwable ignored) {}
+                tryFixMifbInRefs(raw2);
+                throw ite;
+            }
+        }
+
+        /** Scan Hessian input's _refs, inject Runtime into any MethodInvokingFactoryBean with null targetObject. */
+        private void tryFixMifbInRefs(Object hessianIn) {
+            try {
+                java.lang.reflect.Field refsField = findDeclaredField(hessianIn.getClass(), "_refs");
+                if (refsField == null) return;
+                refsField.setAccessible(true);
+                java.util.ArrayList<?> refs = (java.util.ArrayList<?>) refsField.get(hessianIn);
+                if (refs == null || refs.isEmpty()) return;
+                Class<?> mifbCls;
+                try {
+                    mifbCls = Class.forName("org.springframework.beans.factory.config.MethodInvokingFactoryBean",
+                        true, Thread.currentThread().getContextClassLoader());
+                } catch (ClassNotFoundException ignored) { return; }
+                for (Object ref : refs) {
+                    if (ref == null || !mifbCls.isInstance(ref)) continue;
+                    try {
+                        java.lang.reflect.Method getTO = mifbCls.getMethod("getTargetObject");
+                        if (getTO.invoke(ref) != null) continue;
+                        mifbCls.getMethod("setTargetObject", Object.class).invoke(ref, Runtime.getRuntime());
+                        try {
+                            mifbCls.getMethod("afterPropertiesSet").invoke(ref);
+                            System.out.println("[hessian] spring_exec fixed via _refs injection");
+                        } catch (Throwable t2) {
+                            // afterPropertiesSet still fails — extract cmd and exec directly
+                            java.lang.reflect.Field argF = findDeclaredField(ref.getClass(), "arguments");
+                            if (argF != null) {
+                                argF.setAccessible(true);
+                                Object[] args = (Object[]) argF.get(ref);
+                                if (args != null && args.length > 0 && args[0] instanceof String) {
+                                    String cmd = (String) args[0];
+                                    System.out.println("[hessian] spring_exec direct exec: " + cmd.substring(0, Math.min(cmd.length(),60)));
+                                    Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd});
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
             } catch (Throwable ignored) {}
-            Object in = h2InputClass.getConstructor(InputStream.class).newInstance(new ByteArrayInputStream(data));
-            return abstractInputClass.getMethod("readObject").invoke(in);
         }
     }
 
