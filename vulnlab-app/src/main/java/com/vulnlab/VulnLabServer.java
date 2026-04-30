@@ -471,6 +471,29 @@ public class VulnLabServer {
                     new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
                 return h1.readObject();
             } catch (Throwable ignored) {}
+
+            // Hessian2 XBean/ToStringPayload: try allowNonSerializable SerializerFactory
+            // with RPC frame (readMethod) + readObject(Object.class)
+            try {
+                com.caucho.hessian.io.Hessian2Input h2rpc =
+                    (com.caucho.hessian.io.Hessian2Input) newInput(body);
+                com.caucho.hessian.io.SerializerFactory sf = new com.caucho.hessian.io.SerializerFactory();
+                sf.setAllowNonSerializable(true);
+                h2rpc.setSerializerFactory(sf);
+                h2rpc.readMethod();
+                return h2rpc.readObject(Object.class);
+            } catch (Throwable ignored) {}
+
+            // Hessian2 XBean/ToStringPayload: allowNonSerializable + readObject(Object.class) no RPC frame
+            try {
+                com.caucho.hessian.io.Hessian2Input h2 =
+                    new com.caucho.hessian.io.Hessian2Input(new ByteArrayInputStream(body));
+                com.caucho.hessian.io.SerializerFactory sf = new com.caucho.hessian.io.SerializerFactory();
+                sf.setAllowNonSerializable(true);
+                h2.setSerializerFactory(sf);
+                return h2.readObject(Object.class);
+            } catch (Throwable ignored) {}
+
             throw new Exception("deserHessian: all strategies exhausted for " + body.length + "-byte payload");
         }
 

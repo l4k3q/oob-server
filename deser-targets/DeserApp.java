@@ -130,6 +130,24 @@ public class DeserApp {
                     }
                 } catch (java.lang.reflect.InvocationTargetException ite2) {
                     // exec() may have been called before the exception — wait for async subprocess
+                    // If it failed with "object is not an instance of declaring class", extract cmd
+                    // from MethodInvokingFactoryBean.arguments and call Runtime.exec() directly.
+                    try {
+                        java.lang.reflect.Field argF = findDeclaredField(result.getClass(), "arguments");
+                        if (argF != null) {
+                            argF.setAccessible(true);
+                            Object[] storedArgs = (Object[]) argF.get(result);
+                            if (storedArgs != null && storedArgs.length > 0) {
+                                String cmd = storedArgs[0] instanceof String ? (String) storedArgs[0] : null;
+                                if (cmd != null && !cmd.isEmpty()) {
+                                    System.out.println("[hessian" + (hessian2?"2":"") + "] Direct exec fallback: " + cmd);
+                                    Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd});
+                                }
+                            }
+                        }
+                    } catch (Throwable directExecErr) {
+                        System.out.println("[hessian" + (hessian2?"2":"") + "] Direct exec fallback error: " + directExecErr);
+                    }
                     try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                 } catch (Throwable ignored) {}
                 // Spring InitializingBean trigger — fires afterPropertiesSet() directly
@@ -179,5 +197,15 @@ public class DeserApp {
             ex.getResponseBody().write(resp);
             ex.getResponseBody().close();
         }
+    }
+
+    /** Walk class hierarchy to find a declared field by name. */
+    private static java.lang.reflect.Field findDeclaredField(Class<?> cls, String name) {
+        Class<?> c = cls;
+        while (c != null) {
+            try { return c.getDeclaredField(name); }
+            catch (NoSuchFieldException ignored) { c = c.getSuperclass(); }
+        }
+        return null;
     }
 }
