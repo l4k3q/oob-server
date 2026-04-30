@@ -195,17 +195,21 @@ public class VulnLabServer {
      */
     static void triggerLazyValue(Object obj) {
         if (obj == null) return;
-        
+
         try {
             Class<?> lazyValueClass = Class.forName("javax.swing.UIDefaults$LazyValue");
-            
+
             if (!lazyValueClass.isInstance(obj)) return;
 
             // SwingLazyValue fields: className, methodName, args
-            // ProxyLazyValue fields: className, methodName, args (same names, different ClassLoader behavior)
+            // ProxyLazyValue fields: c (className), m (methodName), args
+            // Try both naming conventions to handle both LazyValue subtypes.
             String className  = getFieldStr(obj, "className");
+            if (className == null) className = getFieldStr(obj, "c");
             String methodName = getFieldStr(obj, "methodName");
+            if (methodName == null) methodName = getFieldStr(obj, "m");
             Object[] args     = getFieldArr(obj, "args");
+            if (args == null) args = getFieldArr(obj, "a");
             
 
             // ── SwingLazyValue secondary chain ────────────────────────────────
@@ -388,49 +392,66 @@ public class VulnLabServer {
         // (e.g. Hessian2ToStringPayload XBean chain) encode objects using Hessian1 wire format
         // even when the endpoint is /hessian2 (java-chains implementation detail).
         //
-        // XBean chain note: Hessian2ToStringPayload generates a Hessian2 object stream
-        // that starts with 'C' (0x43 = class definition). Hessian 4.0.66 Hessian2Input
-        // readObject() does not handle 'C' at top level (throws "unknown code 0x43").
-        // We detect this case and use Hessian2Input with explicit class-def-aware parsing
-        // by wrapping the class-def in a try-skip loop.
+        // XBean chain note: Hessian2ToStringPayload wraps the object in an RPC call frame;
+        // after readMethod() the next byte is 'C' (0x43 = class definition). Hessian2Input
+        // readObject() (no-arg) does NOT handle 'C' at top level (switch maps 0x43 to error).
+        // readObject(Class) DOES handle 'C' (case 67 → readObjectDefinition + readObject).
+        // Fix: after RPC readMethod(), call readObject(HashMap.class) instead of readObject().
         private Object deserHessian(byte[] body) throws Exception {
-            // If payload starts with 'C' (0x43, Hessian2 class definition), skip the RPC frame
-            // attempt and go straight to Hessian2 readObject(Class) which handles 'C' defs.
-            // Note: Hessian2Input.readObject() (no-arg) does NOT handle 'C' at the top level
-            // (its switch table maps 0x43 to the error default); only readObject(Class) does
-            // (its switch table explicitly handles case 67→readObjectDefinition+readObject).
-            // Calling readObject(HashMap.class) triggers the class-aware switch.
+            // If payload starts with 'C' (0x43, Hessian2 class definition at top level),
+            // skip the RPC frame attempt — go straight to readObject(HashMap.class).
             boolean startsWithClassDef = body.length > 0 && body[0] == 'C';
+
             if (!startsWithClassDef) {
+                // Strategy 1: RPC frame — readMethod() + readObject(HashMap.class)
+                // readObject(HashMap.class) handles 'C' class definitions that appear after
+                // the RPC method header (XBean chain: RPC header + 'C' object definition).
+                if (hessian2) {
+                    try {
+                        com.caucho.hessian.io.Hessian2Input rpc =
+                            (com.caucho.hessian.io.Hessian2Input) newInput(body);
+                        rpc.readMethod();
+                        return rpc.readObject(java.util.HashMap.class);
+                    } catch (Throwable ignored) {}
+                }
+                // Strategy 2: RPC frame — readMethod() + plain readObject()
                 try {
                     com.caucho.hessian.io.AbstractHessianInput rpc = newInput(body);
                     rpc.readMethod();
                     return rpc.readObject();
                 } catch (Throwable ignored) {}
             }
-            // For Hessian2: try readObject(HashMap.class) which handles 'C' class definitions
-            // at the top level. Falls back to readObject() for non-class-def payloads.
-            try {
-                com.caucho.hessian.io.AbstractHessianInput h = newInput(body);
-                if (h instanceof com.caucho.hessian.io.Hessian2Input) {
-                    return ((com.caucho.hessian.io.Hessian2Input) h).readObject(java.util.HashMap.class);
-                }
-                return h.readObject();
-            } catch (Throwable t2) {
-                if (!hessian2) throw t2 instanceof Exception ? (Exception) t2 : new Exception(t2);
+
+            // Strategy 3: Hessian2 readObject(HashMap.class) — handles 'C' at top level
+            // or 'C' immediately after skipping any leading frame bytes.
+            if (hessian2) {
+                try {
+                    com.caucho.hessian.io.Hessian2Input h2 =
+                        (com.caucho.hessian.io.Hessian2Input) newInput(body);
+                    return h2.readObject(java.util.HashMap.class);
+                } catch (Throwable ignored) {}
             }
-            // Hessian2 fallback: plain readObject() (for non-class-def Hessian2 payloads)
+
+            // Strategy 4: plain readObject()
             try {
                 return newInput(body).readObject();
-            } catch (Throwable ignored) {}
-            // Final fallback: try Hessian1 (some java-chains payloads use Hessian1 wire format)
+            } catch (Throwable t4) {
+                if (!hessian2) throw t4 instanceof Exception ? (Exception) t4 : new Exception(t4);
+            }
+
+            // Hessian2-only fallbacks: try Hessian1 wire format (some java-chains payloads)
             try {
-                com.caucho.hessian.io.HessianInput h1rpc = new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
+                com.caucho.hessian.io.HessianInput h1rpc =
+                    new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
                 h1rpc.readMethod();
                 return h1rpc.readObject();
             } catch (Throwable ignored) {}
-            com.caucho.hessian.io.HessianInput h1 = new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
-            return h1.readObject();
+            try {
+                com.caucho.hessian.io.HessianInput h1 =
+                    new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
+                return h1.readObject();
+            } catch (Throwable ignored) {}
+            throw new Exception("deserHessian: all strategies exhausted for " + body.length + "-byte payload");
         }
 
         public void handle(HttpExchange ex) throws IOException {
@@ -560,4 +581,4 @@ public class VulnLabServer {
         }
     }
 }
-// build-bust-1777476246
+// build-bust-1777530000

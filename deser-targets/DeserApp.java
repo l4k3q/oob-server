@@ -91,9 +91,43 @@ public class DeserApp {
             } catch (Throwable t) {
                 System.out.println("[hessian" + (hessian2?"2":"") + "] Error: " + t.getClass().getName() + ": " + t.getMessage());
             }
-            // Call toString() on result if available — fires SpringExec/SignedObject chains
+            // Trigger gadget chains that need explicit method calls after deserialization:
+            // - toString()/hashCode(): fires SpringExec/SignedObject/ObjectBean/ToStringBean
+            // - FactoryBean.getObject(): fires Spring MethodInvokingFactoryBean.afterPropertiesSet()
+            //   which calls TargetMethod.invoke() → Runtime.exec(cmd) for spring_exec chains
             if (result != null) {
                 try { result.toString(); } catch (Throwable ignored) {}
+                try { result.hashCode(); } catch (Throwable ignored) {}
+                // Spring FactoryBean trigger — fires MethodInvokingFactoryBean spring_exec chain
+                try {
+                    Class<?> fbClass = Class.forName(
+                        "org.springframework.beans.factory.FactoryBean",
+                        true, Thread.currentThread().getContextClassLoader());
+                    if (fbClass.isInstance(result)) {
+                        java.lang.reflect.Method getObj = fbClass.getMethod("getObject");
+                        System.out.println("[hessian" + (hessian2?"2":"") + "] Triggering FactoryBean.getObject()");
+                        getObj.invoke(result);
+                    }
+                } catch (java.lang.reflect.InvocationTargetException ite2) {
+                    Throwable cause = ite2.getCause() != null ? ite2.getCause() : ite2;
+                    System.out.println("[hessian" + (hessian2?"2":"") + "] FactoryBean.getObject() threw: " + cause);
+                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                } catch (Throwable ignored) {}
+                // Spring InitializingBean trigger — fires afterPropertiesSet() directly
+                try {
+                    Class<?> ibClass = Class.forName(
+                        "org.springframework.beans.factory.InitializingBean",
+                        true, Thread.currentThread().getContextClassLoader());
+                    if (ibClass.isInstance(result)) {
+                        java.lang.reflect.Method aps = ibClass.getMethod("afterPropertiesSet");
+                        System.out.println("[hessian" + (hessian2?"2":"") + "] Triggering InitializingBean.afterPropertiesSet()");
+                        aps.invoke(result);
+                    }
+                } catch (java.lang.reflect.InvocationTargetException ite3) {
+                    Throwable cause = ite3.getCause() != null ? ite3.getCause() : ite3;
+                    System.out.println("[hessian" + (hessian2?"2":"") + "] afterPropertiesSet() threw: " + cause);
+                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                } catch (Throwable ignored) {}
             }
             byte[] resp = "OK".getBytes();
             ex.sendResponseHeaders(200, resp.length);
