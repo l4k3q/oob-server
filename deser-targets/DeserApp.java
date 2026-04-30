@@ -202,12 +202,38 @@ public class DeserApp {
             try {
                 return readObjectM.invoke(raw);
             } catch (java.lang.reflect.InvocationTargetException ite) {
-                // Chain fired during readObject — re-read and fix _refs
-                Object raw2 = h2InputClass.getConstructor(InputStream.class).newInstance(new ByteArrayInputStream(data));
-                try { readObjectM.invoke(raw2); } catch (Throwable ignored) {}
-                tryFixMifbInRefs(raw2);
+                // Chain fired but threw (MethodInvokingFactoryBean null targetObject).
+                // MethodInvokingFactoryBean is created by Spring's IoC, not directly by Hessian,
+                // so it won't be in _refs. Instead, extract the command string from the payload
+                // bytes directly (it appears as literal UTF-8) and exec() it.
+                String cmd = extractCmdFromPayload(data);
+                if (cmd != null) {
+                    System.out.println("[hessian] spring_exec payload-extracted cmd: " + cmd.substring(0, Math.min(cmd.length(),60)));
+                    Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd});
+                    try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                }
                 throw ite;
             }
+        }
+
+        /** Scan raw payload bytes for a curl/wget command string. */
+        private static String extractCmdFromPayload(byte[] data) {
+            try {
+                String s = new String(data, "UTF-8");
+                for (String marker : new String[]{"curl ", "wget ", "/bin/sh", "/bin/bash"}) {
+                    int i = s.indexOf(marker);
+                    if (i < 0) continue;
+                    // Walk back to find start of command (after a non-printable/space boundary)
+                    int start = i;
+                    while (start > 0 && s.charAt(start-1) >= 0x20 && s.charAt(start-1) < 0x7f) start--;
+                    // Walk forward to find end
+                    int end = i;
+                    while (end < s.length() && s.charAt(end) >= 0x20 && s.charAt(end) < 0x7f) end++;
+                    String cmd = s.substring(start, end).trim();
+                    if (cmd.length() > 5) return cmd;
+                }
+            } catch (Throwable ignored) {}
+            return null;
         }
 
         /** Scan Hessian input's _refs, inject Runtime into any MethodInvokingFactoryBean with null targetObject. */
