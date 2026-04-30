@@ -418,7 +418,6 @@ public class VulnLabServer {
         // readObject(Class) DOES handle 'C' (case 67 → readObjectDefinition + readObject).
         // Fix: after RPC readMethod(), call readObject(HashMap.class) instead of readObject().
         private Object deserHessian(byte[] body) throws Exception {
-            String ep = hessian2 ? "hessian2" : "hessian";
             // If payload starts with 'C' (0x43, Hessian2 class definition at top level),
             // skip the RPC frame attempt — go straight to readObject(HashMap.class).
             boolean startsWithClassDef = body.length > 0 && body[0] == 'C';
@@ -431,14 +430,14 @@ public class VulnLabServer {
                             (com.caucho.hessian.io.Hessian2Input) newInput(body);
                         rpc.readMethod();
                         return rpc.readObject(java.util.HashMap.class);
-                    } catch (Throwable t) { System.out.println("[" + ep + "] S1 fail: " + t); }
+                    } catch (Throwable ignored) {}
                 }
                 // Strategy 2: RPC frame — readMethod() + plain readObject()
                 try {
                     com.caucho.hessian.io.AbstractHessianInput rpc = newInput(body);
                     rpc.readMethod();
                     return rpc.readObject();
-                } catch (Throwable t) { System.out.println("[" + ep + "] S2 fail: " + t); }
+                } catch (Throwable ignored) {}
             }
 
             // Strategy 3: Hessian2 readObject(HashMap.class) — handles 'C' at top level
@@ -447,14 +446,13 @@ public class VulnLabServer {
                     com.caucho.hessian.io.Hessian2Input h2 =
                         (com.caucho.hessian.io.Hessian2Input) newInput(body);
                     return h2.readObject(java.util.HashMap.class);
-                } catch (Throwable t) { System.out.println("[" + ep + "] S3 fail: " + t); }
+                } catch (Throwable ignored) {}
             }
 
             // Strategy 4: plain readObject()
             try {
                 return newInput(body).readObject();
             } catch (Throwable t4) {
-                System.out.println("[" + ep + "] S4 fail: " + t4);
                 if (!hessian2) throw t4 instanceof Exception ? (Exception) t4 : new Exception(t4);
             }
 
@@ -464,12 +462,12 @@ public class VulnLabServer {
                     new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
                 h1rpc.readMethod();
                 return h1rpc.readObject();
-            } catch (Throwable t) { System.out.println("[" + ep + "] S5 fail: " + t); }
+            } catch (Throwable ignored) {}
             try {
                 com.caucho.hessian.io.HessianInput h1 =
                     new com.caucho.hessian.io.HessianInput(new ByteArrayInputStream(body));
                 return h1.readObject();
-            } catch (Throwable t) { System.out.println("[" + ep + "] S6 fail: " + t); }
+            } catch (Throwable ignored) {}
 
             // Strategy 7: allowNonSerializable + RPC + readObject(Object.class)
             try {
@@ -480,7 +478,7 @@ public class VulnLabServer {
                 h2rpc.setSerializerFactory(sf);
                 h2rpc.readMethod();
                 return h2rpc.readObject(Object.class);
-            } catch (Throwable t) { System.out.println("[" + ep + "] S7 fail: " + t); }
+            } catch (Throwable ignored) {}
 
             // Strategy 8: allowNonSerializable + readObject(Object.class)
             try {
@@ -490,40 +488,40 @@ public class VulnLabServer {
                 sf.setAllowNonSerializable(true);
                 h2.setSerializerFactory(sf);
                 return h2.readObject(Object.class);
-            } catch (Throwable t) { System.out.println("[" + ep + "] S8 fail: " + t); }
+            } catch (Throwable ignored) {}
 
             // Strategy 9: XBean/TomcatElRef fires via partial deserialization — Hessian2 creates
-            // the XBean object but throws at nested class defs (0x43 string error). Extract
-            // partially-built objects from Hessian2Input._refs and call triggerGadgets() on them.
+            // Strategy 9: XBean/TomcatElRef fires via partial deserialization.
+            // Run entirely in background to avoid blocking the HTTP response thread.
             if (hessian2) {
-                com.caucho.hessian.io.Hessian2Input h2partial =
-                    new com.caucho.hessian.io.Hessian2Input(new ByteArrayInputStream(body));
-                com.caucho.hessian.io.SerializerFactory sfPartial = new com.caucho.hessian.io.SerializerFactory();
-                sfPartial.setAllowNonSerializable(true);
-                h2partial.setSerializerFactory(sfPartial);
-                try { h2partial.readObject(Object.class); } catch (Throwable ignored) {}
-                try {
-                    java.lang.reflect.Field refsF = null;
-                    Class<?> c = h2partial.getClass();
-                    while (c != null) {
-                        try { refsF = c.getDeclaredField("_refs"); break; }
-                        catch (NoSuchFieldException e) { c = c.getSuperclass(); }
-                    }
-                    if (refsF != null) {
-                        refsF.setAccessible(true);
-                        java.util.ArrayList<?> refs = (java.util.ArrayList<?>) refsF.get(h2partial);
-                        if (refs != null && !refs.isEmpty()) {
-                            System.out.println("[hessian2] S9: " + refs.size() + " partial refs, triggering gadgets");
-                            for (Object ref : refs) {
-                                if (ref != null) {
-                                    final Object r = ref;
-                                    new Thread(() -> triggerGadgets(r), "partial-trigger").start();
-                                    try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                final byte[] bodyCopy = body;
+                new Thread(() -> {
+                    try {
+                        com.caucho.hessian.io.Hessian2Input h2p =
+                            new com.caucho.hessian.io.Hessian2Input(new ByteArrayInputStream(bodyCopy));
+                        com.caucho.hessian.io.SerializerFactory sf2 = new com.caucho.hessian.io.SerializerFactory();
+                        sf2.setAllowNonSerializable(true);
+                        h2p.setSerializerFactory(sf2);
+                        try { h2p.readObject(Object.class); } catch (Throwable ignored) {}
+                        java.lang.reflect.Field refsF = null;
+                        Class<?> c = h2p.getClass();
+                        while (c != null) {
+                            try { refsF = c.getDeclaredField("_refs"); break; }
+                            catch (NoSuchFieldException e) { c = c.getSuperclass(); }
+                        }
+                        if (refsF != null) {
+                            refsF.setAccessible(true);
+                            java.util.ArrayList<?> refs = (java.util.ArrayList<?>) refsF.get(h2p);
+                            if (refs != null && !refs.isEmpty()) {
+                                System.out.println("[hessian2] S9-bg: " + refs.size() + " partial refs");
+                                for (Object ref : refs) {
+                                    if (ref != null) triggerGadgets(ref);
+                                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                                 }
                             }
                         }
-                    }
-                } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {}
+                }, "s9-bg").start();
             }
             throw new Exception("deserHessian: all strategies exhausted for " + body.length + "-byte payload");
         }
