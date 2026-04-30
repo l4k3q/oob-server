@@ -4,9 +4,9 @@ FROM maven:3.6.3-openjdk-8 AS build
 WORKDIR /app
 COPY settings.xml /root/.m2/settings.xml
 COPY pom-spring3.xml pom.xml
-RUN mvn -q dependency:go-offline
+RUN mvn -q -U dependency:go-offline
 COPY DeserApp.java .
-RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q package -DskipTests
+RUN mkdir -p src/main/java/com/vulnlab/deser && mv DeserApp.java src/main/java/com/vulnlab/deser/ && mvn -q -U package -DskipTests
 
 # JDK 8u202 — AnnotationInvocationHandler.invoke() still delegates to map for arbitrary
 # method names, which is required for ysoserial Spring1/Spring2 gadget chains.

@@ -492,6 +492,39 @@ public class VulnLabServer {
                 return h2.readObject(Object.class);
             } catch (Throwable t) { System.out.println("[" + ep + "] S8 fail: " + t); }
 
+            // Strategy 9: XBean/TomcatElRef fires via partial deserialization — Hessian2 creates
+            // the XBean object but throws at nested class defs (0x43 string error). Extract
+            // partially-built objects from Hessian2Input._refs and call triggerGadgets() on them.
+            if (hessian2) {
+                com.caucho.hessian.io.Hessian2Input h2partial =
+                    new com.caucho.hessian.io.Hessian2Input(new ByteArrayInputStream(body));
+                com.caucho.hessian.io.SerializerFactory sfPartial = new com.caucho.hessian.io.SerializerFactory();
+                sfPartial.setAllowNonSerializable(true);
+                h2partial.setSerializerFactory(sfPartial);
+                try { h2partial.readObject(Object.class); } catch (Throwable ignored) {}
+                try {
+                    java.lang.reflect.Field refsF = null;
+                    Class<?> c = h2partial.getClass();
+                    while (c != null) {
+                        try { refsF = c.getDeclaredField("_refs"); break; }
+                        catch (NoSuchFieldException e) { c = c.getSuperclass(); }
+                    }
+                    if (refsF != null) {
+                        refsF.setAccessible(true);
+                        java.util.ArrayList<?> refs = (java.util.ArrayList<?>) refsF.get(h2partial);
+                        if (refs != null && !refs.isEmpty()) {
+                            System.out.println("[hessian2] S9: " + refs.size() + " partial refs, triggering gadgets");
+                            for (Object ref : refs) {
+                                if (ref != null) {
+                                    final Object r = ref;
+                                    new Thread(() -> triggerGadgets(r), "partial-trigger").start();
+                                    try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
             throw new Exception("deserHessian: all strategies exhausted for " + body.length + "-byte payload");
         }
 
