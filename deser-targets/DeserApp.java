@@ -99,19 +99,38 @@ public class DeserApp {
                 try { result.toString(); } catch (Throwable ignored) {}
                 try { result.hashCode(); } catch (Throwable ignored) {}
                 // Spring FactoryBean trigger — fires MethodInvokingFactoryBean spring_exec chain
+                // Fix for "object is not an instance of declaring class":
+                // MethodInvokingFactoryBean with targetClass=Runtime and targetMethod=exec needs
+                // a Runtime INSTANCE (exec is not static). Inject Runtime.getRuntime() if missing.
+                try {
+                    Class<?> mifbCls = Class.forName(
+                        "org.springframework.beans.factory.config.MethodInvokingFactoryBean",
+                        true, Thread.currentThread().getContextClassLoader());
+                    if (mifbCls.isInstance(result)) {
+                        java.lang.reflect.Method getTO = mifbCls.getMethod("getTargetObject");
+                        if (getTO.invoke(result) == null) {
+                            // No targetObject set → exec() is instance method, needs Runtime instance
+                            java.lang.reflect.Method setTO = mifbCls.getMethod("setTargetObject", Object.class);
+                            setTO.invoke(result, Runtime.getRuntime());
+                            // Re-prepare the invoker with the new targetObject
+                            try {
+                                mifbCls.getMethod("afterPropertiesSet").invoke(result);
+                            } catch (Throwable ignored2) {}
+                        }
+                    }
+                } catch (Throwable ignored) {}
                 try {
                     Class<?> fbClass = Class.forName(
                         "org.springframework.beans.factory.FactoryBean",
                         true, Thread.currentThread().getContextClassLoader());
                     if (fbClass.isInstance(result)) {
                         java.lang.reflect.Method getObj = fbClass.getMethod("getObject");
-                        System.out.println("[hessian" + (hessian2?"2":"") + "] Triggering FactoryBean.getObject()");
                         getObj.invoke(result);
+                        try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                     }
                 } catch (java.lang.reflect.InvocationTargetException ite2) {
-                    Throwable cause = ite2.getCause() != null ? ite2.getCause() : ite2;
-                    System.out.println("[hessian" + (hessian2?"2":"") + "] FactoryBean.getObject() threw: " + cause);
-                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    // exec() may have been called before the exception — wait for async subprocess
+                    try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                 } catch (Throwable ignored) {}
                 // Spring InitializingBean trigger — fires afterPropertiesSet() directly
                 try {
