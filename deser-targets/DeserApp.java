@@ -223,24 +223,46 @@ public class DeserApp {
             }
         }
 
-        /** Scan raw payload bytes for a curl/wget command string. */
+        /** Scan raw payload bytes for embedded command string using Hessian string length header. */
         private static String extractCmdFromPayload(byte[] data) {
             try {
-                String s = new String(data, "UTF-8");
-                for (String marker : new String[]{"curl ", "wget ", "/bin/sh", "/bin/bash"}) {
-                    int i = s.indexOf(marker);
+                for (byte[] marker : new byte[][]{
+                        "curl ".getBytes("UTF-8"),
+                        "wget ".getBytes("UTF-8"),
+                        "/bin/sh".getBytes("UTF-8")}) {
+                    int i = indexOf(data, marker);
                     if (i < 0) continue;
-                    // Walk back to find start of command (after a non-printable/space boundary)
-                    int start = i;
-                    while (start > 0 && s.charAt(start-1) >= 0x20 && s.charAt(start-1) < 0x7f) start--;
-                    // Walk forward to find end
+                    // Hessian string: 'S'/'R' + 2-byte big-endian length + data
+                    // or short string: 1-byte length (0x00-0x1f) + data
+                    // Read the length from Hessian header 3 bytes before "curl"
+                    if (i >= 3) {
+                        int hdr = data[i-3] & 0xff;
+                        if (hdr == 0x53 || hdr == 0x52) { // 'S' final or 'R' non-final chunk
+                            int len = ((data[i-2] & 0xff) << 8) | (data[i-1] & 0xff);
+                            if (len > 0 && i + len <= data.length) {
+                                String cmd = new String(data, i, len, "UTF-8");
+                                System.out.println("[hessian] spring_exec extracted (len=" + len + "): " + cmd.substring(0, Math.min(cmd.length(), 80)));
+                                return cmd;
+                            }
+                        }
+                    }
+                    // Fallback: walk forward from "curl" until non-printable byte
                     int end = i;
-                    while (end < s.length() && s.charAt(end) >= 0x20 && s.charAt(end) < 0x7f) end++;
-                    String cmd = s.substring(start, end).trim();
-                    if (cmd.length() > 5) return cmd;
+                    while (end < data.length && data[end] >= 0x20 && data[end] < 0x7f) end++;
+                    if (end > i + 5) return new String(data, i, end - i, "UTF-8");
                 }
             } catch (Throwable ignored) {}
             return null;
+        }
+
+        private static int indexOf(byte[] haystack, byte[] needle) {
+            outer: for (int i = 0; i <= haystack.length - needle.length; i++) {
+                for (int j = 0; j < needle.length; j++) {
+                    if (haystack[i+j] != needle[j]) continue outer;
+                }
+                return i;
+            }
+            return -1;
         }
 
         /** Scan Hessian input's _refs, inject Runtime into any MethodInvokingFactoryBean with null targetObject. */
