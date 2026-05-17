@@ -14,6 +14,13 @@ from .service import build_callback_urls
 router = APIRouter(prefix="/api/tokens", tags=["tokens"])
 
 
+def _normalize_intent(intent: str) -> str:
+    """Keep old API clients working while storing the LDAP mode used by listeners."""
+    if intent == "serialize":
+        return "jndi_serialize"
+    return intent
+
+
 def _to_out(t: OobToken) -> OobTokenOut:
     s = get_settings()
     return OobTokenOut(
@@ -42,7 +49,7 @@ async def create_token(
         project_id=body.project_id,
         label=body.label,
         protocols=body.protocols,
-        intent=body.intent,
+        intent=_normalize_intent(body.intent),
         payload_spec=body.payload_spec,
     )
     session.add(tok)

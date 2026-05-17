@@ -57,7 +57,7 @@ class OobTokenIn(BaseModel):
     project_id: int
     label: Optional[str] = None
     protocols: list[str] = Field(default_factory=lambda: ["http", "ldap", "rmi", "tcp"])
-    intent: str = "record"  # record / jndi / serialize / memshell
+    intent: str = "record"  # record / jndi / jndi_reference / jndi_serialize / memshell
     payload_spec: dict[str, Any] = Field(default_factory=dict)
 
 

@@ -6,12 +6,30 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Request, Response
+from sqlalchemy import select
 
 from ..collector.bus import HitEvent, bus
 from ..config import get_settings
+from ..db import session_scope
+from ..models import OobToken
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/callback/http", tags=["callback"])
+
+
+async def _class_from_token_spec(token: str) -> bytes | None:
+    async with session_scope() as session:
+        res = await session.execute(select(OobToken).where(OobToken.token == token))
+        row = res.scalar_one_or_none()
+        spec = (row.payload_spec if row else {}) or {}
+        bytecode_b64 = spec.get("bytecode_b64")
+        if not bytecode_b64:
+            return None
+        try:
+            return base64.b64decode(bytecode_b64)
+        except Exception:
+            log.warning("invalid bytecode_b64 for token %s", token)
+            return None
 
 
 async def _publish(token: str, request: Request, kind: str, extra: dict | None = None) -> None:
@@ -58,12 +76,14 @@ async def on_token_subpath(token: str, subpath: str, request: Request) -> Respon
     # Sub-dispatch: class byte delivery
     if subpath.startswith("class/"):
         class_name = subpath[len("class/"):].rstrip("/")
+        sidecar_status: int | None = None
         try:
             async with httpx.AsyncClient(timeout=s.sidecar_timeout) as cli:
                 r = await cli.get(
                     f"{s.sidecar_url}/class",
                     params={"token": token, "class_name": class_name},
                 )
+            sidecar_status = r.status_code
             await _publish(
                 token,
                 request,
@@ -72,7 +92,6 @@ async def on_token_subpath(token: str, subpath: str, request: Request) -> Respon
             )
             if r.status_code == 200:
                 return Response(content=r.content, media_type="application/java-vm")
-            return Response(status_code=404, content=b"class not found")
         except Exception as e:
             log.warning("sidecar class fetch failed: %s", e)
             await _publish(
@@ -81,6 +100,17 @@ async def on_token_subpath(token: str, subpath: str, request: Request) -> Respon
                 "class_fetch_error",
                 {"class_name": class_name, "error": str(e)},
             )
+        fallback_bytes = await _class_from_token_spec(token)
+        if fallback_bytes:
+            await _publish(
+                token,
+                request,
+                "class_fetch_fallback",
+                {"class_name": class_name, "sidecar_status": sidecar_status},
+            )
+            return Response(content=fallback_bytes, media_type="application/java-vm")
+        if sidecar_status is None:
             return Response(status_code=502, content=b"sidecar unreachable")
+        return Response(status_code=404, content=b"class not found")
     await _publish(token, request, "ping", {"subpath": subpath})
     return Response(content=b"ok", media_type="text/plain")

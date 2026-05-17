@@ -6,7 +6,6 @@ bytecode-service/libs/java-chains-linux-amd64.tar.gz
 .mcp-ssh.lock
 .playwright-mcp/
 META-INF/
-com/
 *.bin
 *.db
 *.sqlite

@@ -57,7 +57,7 @@
           <a-select-option value="record">record — 仅记录</a-select-option>
           <a-select-option value="jndi">jndi — LDAP/RMI 重绑</a-select-option>
           <a-select-option value="memshell">memshell — 投递内存马</a-select-option>
-          <a-select-option value="serialize">serialize — 投递反序列化</a-select-option>
+          <a-select-option value="jndi_serialize">jndi_serialize - LDAP javaSerializedData</a-select-option>
         </a-select>
       </a-form-item>
     </a-form>
@@ -108,7 +108,7 @@ const form = ref({ project_id: null as any, label:'', protocols:['http','ldap','
 const urlDrawer = ref({ visible:false, token:'', urls:{} as any })
 const evtDrawer = ref({ visible:false, token:'', events:[] as any[] })
 
-const INTENT_COLOR: Record<string,string> = { record:'default', jndi:'orange', memshell:'red', serialize:'purple' }
+const INTENT_COLOR: Record<string,string> = { record:'default', jndi:'orange', jndi_reference:'cyan', jndi_serialize:'purple', memshell:'red', serialize:'purple' }
 const PROTO_COLOR: Record<string,string> = { http:'green', ldap:'orange', rmi:'red', tcp:'blue', dns:'purple' }
 
 const columns = [
