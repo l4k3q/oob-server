@@ -36,9 +36,9 @@
           <div
             v-for="c in filteredChains"
             :key="c.id"
-            :class="['type-btn', selected?.id === c.id ? 'active' : '']"
+            :class="['type-btn', selected?.id === c.id ? 'active' : '', c.available === false ? 'disabled' : '']"
             @click="pick(c)"
-            :title="c.description"
+            :title="c.available === false ? c.unavailable_reason : c.description"
           >{{ c.name }}</div>
         </div>
       </template>
@@ -48,8 +48,12 @@
         <div style="font-size:12px;color:#1677ff;font-weight:500;margin-bottom:4px">
           {{ selected.name }}
           <a-tag v-if="selected.requires_sidecar" color="orange" style="margin-left:4px;font-size:10px">需要 sidecar</a-tag>
+          <a-tag v-if="selected.available === false" color="red" style="margin-left:4px;font-size:10px">Unavailable</a-tag>
         </div>
         <div style="font-size:12px;color:#8c8c8c;line-height:1.5">{{ selected.description }}</div>
+        <div v-if="selected.available === false" style="font-size:12px;color:#cf1322;line-height:1.5;margin-top:6px">
+          {{ selected.unavailable_reason }}
+        </div>
       </div>
 
       <a-divider style="margin:12px 0" v-if="selected" />
@@ -78,7 +82,7 @@
           </a-form-item>
         </a-form>
 
-        <a-button type="primary" block @click="gen" :loading="generating" style="margin-top:4px">
+        <a-button type="primary" block @click="gen" :loading="generating" :disabled="selected.available === false" style="margin-top:4px">
           <ThunderboltOutlined /> 生成 Payload
         </a-button>
       </template>
@@ -262,6 +266,10 @@ function pickAndClear(c: any) {
 
 async function gen() {
   if (!selected.value) return
+  if (selected.value.available === false) {
+    message.error(selected.value.unavailable_reason || 'Payload is unavailable')
+    return
+  }
   generating.value = true
   try {
     const { data } = await generatePayload({ type: selected.value.id, params: params.value })
@@ -348,6 +356,18 @@ onMounted(async () => {
 }
 .type-btn:hover { border-color: #1677ff; color: #1677ff; }
 .type-btn.active { border-color: #1677ff; color: #fff; background: #1677ff; }
+.type-btn.disabled {
+  color: #bfbfbf;
+  background: #f5f5f5;
+  border-color: #e8e8e8;
+  text-decoration: line-through;
+}
+.type-btn.disabled.active {
+  color: #fff;
+  background: #cf1322;
+  border-color: #cf1322;
+  text-decoration: none;
+}
 
 .sub-cat-label {
   font-size: 10px;

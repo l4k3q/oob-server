@@ -20,7 +20,42 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/payloads", tags=["payloads"])
 
 
-def _chain_out(entry: ChainEntry) -> dict[str, Any]:
+async def _sidecar_chain_status() -> tuple[set[str] | None, dict[str, Any]]:
+    s = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as cli:
+            r = await cli.get(f"{s.sidecar_url}/chains")
+        if r.status_code != 200:
+            return None, {"error": f"bytecode-service /chains returned HTTP {r.status_code}"}
+        data = r.json()
+        return set(data.get("chains", [])), data
+    except httpx.ConnectError:
+        return None, {"error": "bytecode-service is not running"}
+    except Exception as e:
+        return None, {"error": str(e)}
+
+
+def _unavailable_reason(entry: ChainEntry, sidecar_meta: dict[str, Any]) -> str:
+    if entry.id.startswith("jchains_") and not sidecar_meta.get("java_chains_available", True):
+        return "java-chains is not available in the sidecar runtime."
+    return "bytecode-service does not currently support this chain."
+
+
+def _chain_out(
+    entry: ChainEntry,
+    supported_sidecar_chains: set[str] | None = None,
+    sidecar_meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    sidecar_meta = sidecar_meta or {}
+    available = True
+    unavailable_reason = ""
+    if entry.requires_sidecar:
+        if supported_sidecar_chains is None:
+            available = False
+            unavailable_reason = sidecar_meta.get("error", "bytecode-service availability is unknown.")
+        elif entry.id not in supported_sidecar_chains:
+            available = False
+            unavailable_reason = _unavailable_reason(entry, sidecar_meta)
     return {
         "id": entry.id,
         "category": entry.category,
@@ -28,6 +63,8 @@ def _chain_out(entry: ChainEntry) -> dict[str, Any]:
         "name": entry.name,
         "description": entry.description,
         "requires_sidecar": entry.requires_sidecar,
+        "available": available,
+        "unavailable_reason": unavailable_reason,
         "tags": entry.tags,
         "params": [
             {
@@ -49,6 +86,7 @@ async def get_catalog(
     q: str | None = None,
     _user: User = Depends(current_user),
 ) -> list[dict[str, Any]]:
+    supported_sidecar_chains, sidecar_meta = await _sidecar_chain_status()
     entries = CATALOG
     if category:
         entries = [e for e in entries if e.category == category]
@@ -58,7 +96,7 @@ async def get_catalog(
             e for e in entries
             if q_low in e.name.lower() or q_low in e.description.lower() or any(q_low in t for t in e.tags)
         ]
-    return [_chain_out(e) for e in entries]
+    return [_chain_out(e, supported_sidecar_chains, sidecar_meta) for e in entries]
 
 
 @router.get("/catalog/{chain_id}")
@@ -66,7 +104,8 @@ async def get_chain(chain_id: str, _user: User = Depends(current_user)) -> dict[
     entry = CATALOG_BY_ID.get(chain_id)
     if not entry:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "chain not found")
-    return _chain_out(entry)
+    supported_sidecar_chains, sidecar_meta = await _sidecar_chain_status()
+    return _chain_out(entry, supported_sidecar_chains, sidecar_meta)
 
 
 @router.post("/generate", response_model=PayloadResponse)
@@ -180,6 +219,18 @@ async def generate_payload(
     # ── Sidecar-delegated chains ──────────────────────────────────────────────
     entry = CATALOG_BY_ID.get(chain_id)
     if entry and entry.requires_sidecar:
+        supported_sidecar_chains, sidecar_meta = await _sidecar_chain_status()
+        if supported_sidecar_chains is None:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                sidecar_meta.get("error", "bytecode-service is not running"),
+            )
+        if chain_id not in supported_sidecar_chains:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE if chain_id.startswith("jchains_")
+                else status.HTTP_422_UNPROCESSABLE_ENTITY,
+                _unavailable_reason(entry, sidecar_meta),
+            )
         try:
             async with httpx.AsyncClient(timeout=s.sidecar_timeout) as cli:
                 r = await cli.post(

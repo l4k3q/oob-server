@@ -393,6 +393,21 @@ public class JavaChainsProxyHandler implements ChainHandler {
     /** All chain IDs handled by this proxy (for ChainRegistry auto-registration). */
     public java.util.Set<String> chainIds() { return CHAIN_MAP.keySet(); }
 
+    public boolean isAvailable() {
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/version"))
+                .timeout(Duration.ofSeconds(2))
+                .GET()
+                .build();
+            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+            return resp.statusCode() >= 200 && resp.statusCode() < 300;
+        } catch (Exception e) {
+            log.warning("java-chains unavailable at " + baseUrl + ": " + e.getMessage());
+            return false;
+        }
+    }
+
     private final HttpClient http = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .followRedirects(HttpClient.Redirect.NORMAL)

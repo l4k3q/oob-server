@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Maps every catalog chain ID → ChainHandler.
@@ -13,6 +14,8 @@ import java.util.Set;
 public class ChainRegistry {
 
     private final Map<String, ChainHandler> handlers = new HashMap<>();
+    private final Set<String> javaChainsProxyIds;
+    private final boolean javaChainsAvailable;
 
     public ChainRegistry(
             YsoserialHandler ysoserial,
@@ -92,7 +95,11 @@ public class ChainRegistry {
 
         // ── jchains_* → JavaChainsProxyHandler (backed by java-chains service) ─
         // Requires java-chains running at javachains.url (default :8011) with CHAINS_AUTH=false
-        javaChains.chainIds().forEach(id -> handlers.put(id, javaChains));
+        javaChainsProxyIds = Set.copyOf(javaChains.chainIds());
+        javaChainsAvailable = javaChains.isAvailable();
+        if (javaChainsAvailable) {
+            javaChains.chainIds().forEach(id -> handlers.put(id, javaChains));
+        }
 
         // Overrides: some jchains_* IDs are better served by local handlers
         // jchains_shiro_cbc: java-chains ShiroPayload has encode issues; use ShiroChainHandler with CB1
@@ -112,5 +119,15 @@ public class ChainRegistry {
 
     public Set<String> supported() {
         return handlers.keySet();
+    }
+
+    public boolean javaChainsAvailable() {
+        return javaChainsAvailable;
+    }
+
+    public Set<String> unavailableJavaChains() {
+        Set<String> unavailable = new TreeSet<>(javaChainsProxyIds);
+        unavailable.removeAll(handlers.keySet());
+        return unavailable;
     }
 }

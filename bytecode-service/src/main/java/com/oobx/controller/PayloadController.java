@@ -43,6 +43,10 @@ public class PayloadController {
 
     @GetMapping("/chains")
     public ResponseEntity<Map<String, Object>> listChains() {
-        return ResponseEntity.ok(Map.of("chains", registry.supported()));
+        return ResponseEntity.ok(Map.of(
+            "chains", registry.supported(),
+            "java_chains_available", registry.javaChainsAvailable(),
+            "unavailable_jchains", registry.unavailableJavaChains()
+        ));
     }
 }
