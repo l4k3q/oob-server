@@ -32,6 +32,10 @@ exec java \
     --add-opens java.base/java.lang=ALL-UNNAMED \
     --add-opens java.base/java.lang.reflect=ALL-UNNAMED \
     --add-opens java.base/java.util=ALL-UNNAMED \
+    --add-modules jdk.naming.rmi \
+    --add-opens jdk.naming.rmi/com.sun.jndi.rmi.registry=ALL-UNNAMED \
+    --add-opens java.rmi/java.rmi.server=ALL-UNNAMED \
+    --add-opens java.rmi/sun.rmi.server=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.trax=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.runtime=ALL-UNNAMED \

