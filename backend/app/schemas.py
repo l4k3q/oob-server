@@ -92,7 +92,7 @@ class EventOut(BaseModel):
 
 # ---------- Payload ----------
 class PayloadRequest(BaseModel):
-    type: str  # jndi_ldap / jndi_rmi / ysoserial / java_chains / memshell
+    type: str  # jndi_ldap / ysoserial / java_chains / memshell
     token: Optional[str] = None
     params: dict[str, Any] = Field(default_factory=dict)
 
@@ -111,7 +111,7 @@ class MemshellRequest(BaseModel):
     type: str  # filter / servlet / listener / valve / interceptor / controller
     params: dict[str, Any] = Field(default_factory=dict)
     token: Optional[str] = None
-    deliver: str = "bytecode"  # bytecode / jndi_ldap / jndi_rmi / serialize
+    deliver: str = "bytecode"  # bytecode / jndi_ldap / serialize
 
 
 class MemshellResponse(BaseModel):

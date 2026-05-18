@@ -117,7 +117,7 @@
                 />
                 <a-button size="small" type="primary" ghost @click="copy(jndiUrls.ldap_url)">复制</a-button>
               </div>
-              <div style="display:flex;gap:8px;align-items:center">
+              <div v-if="jndiUrls.rmi_url" style="display:flex;gap:8px;align-items:center">
                 <a-tag color="red" style="min-width:52px;text-align:center;flex-shrink:0;font-family:monospace">RMI</a-tag>
                 <a-input
                   :value="jndiUrls.rmi_url"

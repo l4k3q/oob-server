@@ -64,7 +64,7 @@
           <a-select v-model:value="form.deliver" style="width:100%">
             <a-select-option value="bytecode">bytecode — 下载 .class 文件</a-select-option>
             <a-select-option value="jndi_ldap">JNDI LDAP 重绑定</a-select-option>
-            <a-select-option value="jndi_rmi">JNDI RMI 重绑定</a-select-option>
+            <a-select-option value="jndi_rmi" disabled>JNDI RMI - not implemented</a-select-option>
             <a-select-option value="serialize">反序列化链包裹</a-select-option>
           </a-select>
         </a-form-item>

@@ -20,7 +20,7 @@ INTENT_GUIDE = {
     "jndi": {
         "description": "LDAP 重绑定模式：返回 JavaNamingReference 指向 sidecar class 端点",
         "ldap_behavior": "返回 javaClassName + javaCodeBase + javaFactory attrs → 目标 JVM 拉取并加载字节码",
-        "rmi_behavior": "RMI listener 向 sidecar 请求 JRMP referral bytes 后转发给目标",
+        "rmi_behavior": "RMI listener only records connections; RMI rebind/JRMP referral is not implemented",
         "use_when": "JNDI 注入漏洞（Log4Shell/FastJson/JNDI EL 等），目标 JDK ≤ 8u191 或高版本绕过",
         "prerequisite": "必须先调用 POST /api/rebind/{token}/set 或通过 Memshell Lab 生成字节码并注册",
     },
@@ -54,7 +54,7 @@ async def intent_guide(_user: User = Depends(current_user)) -> dict:
     1. 创建 token（intent=jndi/memshell/serialize）
     2. 在 Memshell Lab 或 Payload Builder 生成字节码
     3. 调用 POST /api/rebind/{token}/set 注册字节码到 sidecar
-    4. 将 ldap_url/rmi_url 注入目标漏洞点
+    4. 将 ldap_url 注入目标漏洞点
     5. 目标回连 → LDAP 返回 reference → sidecar 提供 .class → 目标加载执行
     """
     return {"intents": INTENT_GUIDE}
