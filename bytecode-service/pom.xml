@@ -66,9 +66,91 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
+    <dependency>
+      <groupId>commons-lang</groupId>
+      <artifactId>commons-lang</artifactId>
+      <version>2.6</version>
+    </dependency>
 
     <!-- ysoserial / marshalsec loaded at runtime via isolated ClassLoader, NOT here -->
     <!-- See YsoserialHandler.invokeYsoserial() -->
+
+    <!-- Embedded java-chains engine. These jars are vendored under libs/chains-jars
+         so the sidecar can generate jchains_* payloads without an external
+         java-chains web service binary. -->
+    <dependency>
+      <groupId>com.ar3h</groupId>
+      <artifactId>chains-plugin-api</artifactId>
+      <version>1.4.4</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/libs/chains-jars/chains-plugin-api-1.4.4.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>com.ar3h</groupId>
+      <artifactId>chains-common</artifactId>
+      <version>1.4.4</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/libs/chains-jars/chains-common-1.4.4.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>com.ar3h</groupId>
+      <artifactId>chains-core</artifactId>
+      <version>1.4.4</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/libs/chains-jars/chains-core-1.4.4.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>com.ar3h</groupId>
+      <artifactId>chains-thirdparty</artifactId>
+      <version>1.4.4</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/libs/chains-jars/chains-thirdparty-1.4.4.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>cn.hutool</groupId>
+      <artifactId>hutool-all</artifactId>
+      <version>5.8.29</version>
+    </dependency>
+    <dependency>
+      <groupId>org.reflections</groupId>
+      <artifactId>reflections</artifactId>
+      <version>0.10.2</version>
+    </dependency>
+    <dependency>
+      <groupId>com.nqzero</groupId>
+      <artifactId>permit-reflect</artifactId>
+      <version>0.4</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <version>1.17.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.alibaba</groupId>
+      <artifactId>fastjson</artifactId>
+      <version>1.2.58</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.xbean</groupId>
+      <artifactId>xbean-naming</artifactId>
+      <version>4.20</version>
+    </dependency>
+    <dependency>
+      <groupId>org.beanshell</groupId>
+      <artifactId>bsh</artifactId>
+      <version>2.0b5</version>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.groovy</groupId>
+      <artifactId>groovy-all</artifactId>
+      <version>2.4.3</version>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <version>2.1.214</version>
+    </dependency>
 
     <!-- Shiro deserialization chains -->
     <dependency>
@@ -119,6 +201,16 @@
       <artifactId>spring-aop</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.aspectj</groupId>
+      <artifactId>aspectjrt</artifactId>
+      <version>1.9.22.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.aspectj</groupId>
+      <artifactId>aspectjweaver</artifactId>
+      <version>1.9.22.1</version>
+    </dependency>
+    <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-tx</artifactId>
     </dependency>
@@ -128,6 +220,16 @@
       <groupId>rome</groupId>
       <artifactId>rome</artifactId>
       <version>1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.rometools</groupId>
+      <artifactId>rome</artifactId>
+      <version>1.18.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.rometools</groupId>
+      <artifactId>rome-utils</artifactId>
+      <version>1.18.0</version>
     </dependency>
 
     <!-- Tomcat Naming for BeanFactory JNDI bypass -->
@@ -156,6 +258,16 @@
       <artifactId>bcel</artifactId>
       <version>6.6.1</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.flex.blazeds</groupId>
+      <artifactId>flex-messaging-core</artifactId>
+      <version>4.7.3</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flex.blazeds</groupId>
+      <artifactId>flex-messaging-common</artifactId>
+      <version>4.7.3</version>
+    </dependency>
   </dependencies>
 
   <build>
@@ -165,6 +277,7 @@
         <artifactId>spring-boot-maven-plugin</artifactId>
         <configuration>
           <mainClass>com.oobx.App</mainClass>
+          <includeSystemScope>true</includeSystemScope>
         </configuration>
       </plugin>
     </plugins>

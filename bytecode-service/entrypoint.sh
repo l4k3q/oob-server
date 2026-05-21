@@ -21,7 +21,7 @@ if [ -f "$JCDIR/java-chains.jar" ]; then
         sleep 1
     done
 else
-    echo "[entrypoint] WARN: java-chains not found at $JCDIR/java-chains.jar — proxy chains unavailable"
+    echo "[entrypoint] java-chains web bundle not found at $JCDIR/java-chains.jar; using embedded chains-core engine in sidecar"
 fi
 
 # ── Start bytecode-service sidecar ────────────────────────────────────────────
@@ -31,7 +31,11 @@ exec java \
     --add-opens java.sql.rowset/com.sun.rowset=ALL-UNNAMED \
     --add-opens java.base/java.lang=ALL-UNNAMED \
     --add-opens java.base/java.lang.reflect=ALL-UNNAMED \
+    --add-opens java.base/java.security=ALL-UNNAMED \
     --add-opens java.base/java.util=ALL-UNNAMED \
+    --add-opens java.desktop/javax.swing=ALL-UNNAMED \
+    --add-opens java.naming/javax.naming=ALL-UNNAMED \
+    --add-opens java.naming/javax.naming.ldap=ALL-UNNAMED \
     --add-modules jdk.naming.rmi \
     --add-opens jdk.naming.rmi/com.sun.jndi.rmi.registry=ALL-UNNAMED \
     --add-opens java.rmi/java.rmi.server=ALL-UNNAMED \
@@ -41,5 +45,13 @@ exec java \
     --add-opens java.xml/com.sun.org.apache.xalan.internal.xsltc.runtime=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xml.internal.dtm=ALL-UNNAMED \
     --add-opens java.xml/com.sun.org.apache.xml.internal.serializer=ALL-UNNAMED \
-    -jar /app/bytecode-service-0.1.0.jar \
+    --add-opens java.xml/com.sun.org.apache.xpath.internal=ALL-UNNAMED \
+    --add-opens java.xml/com.sun.org.apache.xpath.internal.objects=ALL-UNNAMED \
+    --add-exports java.xml/com.sun.org.apache.bcel.internal.classfile=ALL-UNNAMED \
+    --add-exports java.xml/com.sun.org.apache.bcel.internal.util=ALL-UNNAMED \
+    --add-exports java.xml/com.sun.org.apache.xpath.internal.objects=ALL-UNNAMED \
+    -Dspring.autoconfigure.exclude=org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration \
+    -Dloader.path=/app/libs/java-chains-deps,/app/libs/chains-jars \
+    -cp /app/bytecode-service-0.1.0.jar \
+    org.springframework.boot.loader.launch.PropertiesLauncher \
     "$@"
